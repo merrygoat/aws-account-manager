@@ -4,7 +4,7 @@ class Config:
     SQLALCHEMY_DATABASE_URI = f"sqlite:///../aam/data.db"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SECRET_KEY = "abc123"
-    TEMPLATES_AUTO_RELOAD = True
+    TEMPLATES_AUTO_RELOAD = False
 
 
 class Production(Config):

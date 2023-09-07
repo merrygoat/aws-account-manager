@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, ForeignKey
 from sqlalchemy.orm import relationship
 
-from db import db_instance
+from aam.db import db_instance
 
 
 class Organization(db_instance.Model):
@@ -10,6 +10,9 @@ class Organization(db_instance.Model):
 
     def __repr__(self):
         return self.name
+
+    def to_json(self):
+        return {"id": self.id, "name": self.name}
 
 
 class Account(db_instance.Model):

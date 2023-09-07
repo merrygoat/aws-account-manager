@@ -16,13 +16,14 @@
     <link rel="stylesheet" type="text/css" href="{{ url_for('static',filename='styles/style.css') }}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
 {#    <link rel="icon" type="image/png" href="{{ url_for('static',filename='icon.png') }}" sizes="32x32">#}
-
+    {% block head %}
+    {% endblock %}
 </head>
 <body>
 
 <div class="container">
 
-    {% set navigation_bar = [('/', 'index', 'Home'), ('about', 'about', 'About')] -%}
+    {% set navigation_bar = [('/', 'index', 'Home'), ('organization', 'organization', 'Organizations')] -%}
 
     <header class="d-flex flex-wrap justify-content-center py-3 mb-4 border-bottom">
         <a href="/" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-dark text-decoration-none">
