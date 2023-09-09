@@ -3,6 +3,7 @@ from flask import render_template, request
 
 from aam import app
 import aam.queries.organization
+import aam.queries.account
 
 def html_response(response) -> flask.Response:
     return flask.make_response((response, 200, {'Content-Type': 'text/html; charset=utf-8'}))
@@ -22,7 +23,8 @@ def organization() -> flask.Response:
 def get_organizations() -> flask.Response:
     if request.method == "GET":
         all_organizations = aam.queries.organization.get_all_organizations()
-        return flask.make_response(all_organizations, 200, {'Content-Type': 'text/json; charset=utf-8'})
+        org_data = [org.to_json() for org in all_organizations]
+        return flask.make_response(org_data, 200, {'Content-Type': 'text/json; charset=utf-8'})
     elif request.method == "POST":
         result = aam.queries.organization.add_new_organization(request.json)
         if result.success:
@@ -41,3 +43,20 @@ def delete_organization(record_id: str) -> flask.Response:
         if result.success:
             return flask.make_response("", 200)
 
+
+@app.route('/account', methods=["GET"])
+def account() -> flask.Response:
+    return html_response(render_template("account.html"))
+
+
+@app.route('/account/data', methods=["GET"])
+def get_accounts() -> flask.Response:
+    if request.method == "GET":
+        all_accounts = aam.queries.account.get_all_accounts()
+        account_data = []
+        for acc in all_accounts:
+            account_data.append({"account_id": acc.id, "name": acc.name, "organization": acc.organization.name,
+                                 "status": acc.status})
+        return flask.make_response(all_accounts, 200, {'Content-Type': 'text/json; charset=utf-8'})
+    elif request.method == "POST":
+        pass

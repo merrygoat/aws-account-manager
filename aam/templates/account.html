@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% set active_page = "account" %}
+
+{% block head %}
+        <script src="https://cdn.zinggrid.com/zinggrid.min.js" defer></script>
+{% endblock %}
+
+{% block body %}
+    <div class="my-3">
+        <h2>Organization Management</h2>
+        <zing-grid src="/account/data" caption="CRUD Endpoint" editor-controls pager page-size="5" layout="row">
+            <zg-colgroup>
+                <zg-column index="account_id" type="string"></zg-column>
+                <zg-column index="name" type="string"></zg-column>
+                <zg-column index="organization" type="string"></zg-column>
+                <zg-column index="status" type="string"></zg-column>
+            </zg-colgroup>
+        </zing-grid>
+    </div>
+
+{% endblock %}

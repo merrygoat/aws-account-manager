@@ -1,14 +1,13 @@
 import sqlalchemy.exc
-import jsonpickle
 
 from aam.db import db_instance
 from aam.models import Organization
 from aam.utilities import Result
 
 
-def get_all_organizations() -> list[dict]:
+def get_all_organizations() -> list[Organization]:
     organizations = Organization.query.all()
-    return [org.to_json() for org in organizations]
+    return organizations
 
 
 def add_new_organization(json: dict) -> Result:
