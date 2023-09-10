@@ -54,3 +54,12 @@ function add_new_record(event, url) {
         }
     )
 }
+
+function fetch_data(url) {
+    fetch(url
+    ).then(function (response) {
+        return response.json();
+    }).then(function (data) {
+        gridOptions.api.setRowData(data);
+    });
+}

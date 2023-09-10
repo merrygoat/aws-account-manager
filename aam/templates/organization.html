@@ -19,20 +19,14 @@
     </div>
 
     <script>
-        data_promise = fetch("organization/data"
-        ).then(function (response) {
-            return response.json();
-        }).then(function (data) {
-            gridOptions.api.setRowData(data);
-        });
+        fetch_data("organization/data")
 
         // let the grid know which columns and what data to use
         const gridOptions = {
             columnDefs: [
                 {checkboxSelection: true, headerCheckboxSelection: true, pinned: 'left',
                 width: 50, field: 'checkboxBtn'},
-               // {field: "id", hide: true},
-                {field: "id"},
+                {field: "id", hide: true},
                 {field: "name", editable: true, resizable: true},
             ],
             rowData: [{}],
