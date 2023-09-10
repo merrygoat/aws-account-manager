@@ -20,13 +20,13 @@ def add_new_organization(json: dict) -> Result:
     return Result(True, {"id": new_organization.id})
 
 
-def delete_organization(json: dict):
+def delete_organization(json: dict) -> Result:
     Organization.query.filter_by(id=json["id"]).delete()
     db_instance.session.commit()
     return Result(True, {})
 
 
-def edit_organization(record: dict):
+def edit_organization(record: dict) -> Result:
     organization = Organization.query.filter_by(id=record["id"]).first()
     organization.name = record["name"]
     db_instance.session.commit()

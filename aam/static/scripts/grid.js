@@ -63,3 +63,11 @@ function fetch_data(url) {
         gridOptions.api.setRowData(data);
     });
 }
+
+function initialise_grid() {
+    // Set up the grid after the page has finished loading
+    document.addEventListener('DOMContentLoaded', () => {
+        const gridDiv = document.querySelector('#page_grid');
+        new agGrid.Grid(gridDiv, gridOptions);
+    });
+}
