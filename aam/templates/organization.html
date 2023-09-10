@@ -2,18 +2,51 @@
 {% set active_page = "organization" %}
 
 {% block head %}
-        <script src="https://cdn.zinggrid.com/zinggrid.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/ag-grid-community/dist/ag-grid-community.min.js"></script>
+    <script src={{ url_for('static', filename='scripts/grid.js') }}></script>
+
 {% endblock %}
 
 {% block body %}
     <div class="my-3">
         <h2>Organization Management</h2>
-        <zing-grid src="/organization/data" caption="CRUD Endpoint" editor-controls pager page-size="5" layout="row">
-            <zg-colgroup>
-                <zg-column index="name" type="string"></zg-column>
-            </zg-colgroup>
-        </zing-grid>
+        <div id="grid-buttons">
+            <button id="add_row" onclick=add_empty_row()>Add Row</button>
+            <button id="delete_row" onclick=delete_selected_rows("organization/data")>Delete Selected Rows</button>
+        </div>
+
+        <div id="organization_grid" style="height: 200px; width:500px;" class="ag-theme-alpine"></div>
     </div>
 
+    <script>
+        data_promise = fetch("organization/data"
+        ).then(function (response) {
+            return response.json();
+        }).then(function (data) {
+            gridOptions.api.setRowData(data);
+        });
+
+        // let the grid know which columns and what data to use
+        const gridOptions = {
+            columnDefs: [
+                {checkboxSelection: true, headerCheckboxSelection: true, pinned: 'left',
+                width: 50, field: 'checkboxBtn'},
+               // {field: "id", hide: true},
+                {field: "id"},
+                {field: "name", editable: true, resizable: true},
+            ],
+            rowData: [{}],
+            getRowId: params => params.data.id,
+            suppressDragLeaveHidesColumns: true,
+            onCellValueChanged: (event) => cell_edited(event, "organization/data")
+        }
+
+        // Set up the grid after the page has finished loading
+        document.addEventListener('DOMContentLoaded', () => {
+            const gridDiv = document.querySelector('#organization_grid');
+            new agGrid.Grid(gridDiv, gridOptions);
+        });
+
+    </script>
 
 {% endblock %}

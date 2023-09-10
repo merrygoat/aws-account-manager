@@ -5,6 +5,7 @@ from aam import app
 import aam.queries.organization
 import aam.queries.account
 
+
 def html_response(response) -> flask.Response:
     return flask.make_response((response, 200, {'Content-Type': 'text/html; charset=utf-8'}))
 
@@ -19,29 +20,26 @@ def organization() -> flask.Response:
     return html_response(render_template("organization.html"))
 
 
-@app.route('/organization/data', methods=["GET", "POST"])
+@app.route('/organization/data', methods=["GET", "PUT", "DELETE", "POST"])
 def get_organizations() -> flask.Response:
     if request.method == "GET":
         all_organizations = aam.queries.organization.get_all_organizations()
         org_data = [org.to_json() for org in all_organizations]
         return flask.make_response(org_data, 200, {'Content-Type': 'text/json; charset=utf-8'})
+    elif request.method == "PUT":
+        result = aam.queries.organization.edit_organization(request.json)
+        if result.success:
+            return flask.make_response("{}", 200, {'Content-Type': 'text/json; charset=utf-8'})
     elif request.method == "POST":
         result = aam.queries.organization.add_new_organization(request.json)
         if result.success:
-            return flask.make_response(result.response, 200, {'Content-Type': 'text/html; charset=utf-8'})
-
-
-@app.route('/organization/data/<record_id>', methods=["DELETE", "PUT"])
-def delete_organization(record_id: str) -> flask.Response:
-    record_id = int(record_id)
-    if request.method == "DELETE":
-        result = aam.queries.organization.delete_organization(record_id)
+            return flask.make_response(result.response, 200, {'Content-Type': 'text/json; charset=utf-8'})
+    elif request.method == "DELETE":
+        result = aam.queries.organization.delete_organization(request.json[0])
         if result.success:
-            return flask.make_response("", 200)
-    elif request.method == "PUT":
-        result = aam.queries.organization.edit_organization(record_id, request.json)
-        if result.success:
-            return flask.make_response("", 200)
+            return flask.make_response("{}", 200, {'Content-Type': 'text/json; charset=utf-8'})
+        else:
+            return flask.make_response("{}", 500, {'Content-Type': 'text/json; charset=utf-8'})
 
 
 @app.route('/account', methods=["GET"])

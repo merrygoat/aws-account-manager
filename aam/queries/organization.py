@@ -16,17 +16,18 @@ def add_new_organization(json: dict) -> Result:
     try:
         db_instance.session.commit()
     except sqlalchemy.exc.IntegrityError:
-        return Result(False, "Organization not added. Unknown error.")
-    return Result(True, str(new_organization.id))
+        return Result(False, {"error": "Organization not added. Unknown error."})
+    return Result(True, {"id": new_organization.id})
 
 
-def delete_organization(record_id: int):
-    Organization.query.filter_by(id=record_id).delete()
+def delete_organization(json: dict):
+    Organization.query.filter_by(id=json["id"]).delete()
     db_instance.session.commit()
+    return Result(True, {})
 
 
-def edit_organization(record_id: int, json: dict):
-    organization = Organization.query.filter_by(id=record_id).first()
-    organization.name = json["name"]
+def edit_organization(record: dict):
+    organization = Organization.query.filter_by(id=record["id"]).first()
+    organization.name = record["name"]
     db_instance.session.commit()
-    return Result(True, "")
+    return Result(True, {})
