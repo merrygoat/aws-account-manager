@@ -30,7 +30,8 @@
             rowData: [{}],
             getRowId: params => params.data.id,
             suppressDragLeaveHidesColumns: true,
-            onCellValueChanged: (event) => cell_edited(event, "organization/data")
+            editType: 'fullRow',
+            onRowEditingStopped: (event) => row_edited(event, "organization/data")
         }
 
         initialise_grid();
