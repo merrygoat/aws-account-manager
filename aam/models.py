@@ -32,7 +32,7 @@ class Organization(db.Model, JsonMixin):
 
     def json_repr(self):
         """Return a representation of the object in JSON format."""
-        return {"account_name": self.name}
+        return {"organization": self.name}
 
 
 class Person(db.Model, JsonMixin):
@@ -58,8 +58,8 @@ class Account(db.Model, JsonMixin):
     account_id: Mapped[str] = mapped_column(String(12))
     name: Mapped[str] = mapped_column(String(150))
     organization_id: Mapped[int] = mapped_column(ForeignKey('organization.id'))
-    organization: Mapped[Organization] = relationship(back_populates="accounts")
-    status: Mapped[Enum] = mapped_column(Enum(AccountStatus))
+    organization: Mapped[Organization] = relationship(back_populates="accounts", lazy="selectin")
+    account_status: Mapped[Enum] = mapped_column(Enum(AccountStatus))
     num_MFA_devices: Mapped[int] = mapped_column(Integer)
     email: Mapped[str] = mapped_column(String(150))
     # business_owner_id = Column(Integer, ForeignKey('business_owner.id'))

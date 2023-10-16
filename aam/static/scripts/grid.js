@@ -17,7 +17,7 @@ function add_empty_row() {
     gridOptions.api.applyTransaction({add: [{id: -1}]})
 }
 
-function cell_edited(event, url) {
+function row_edited(event, url) {
     if (event.node.id === '-1') {
         add_new_record(event, url)
     } else {

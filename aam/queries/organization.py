@@ -8,12 +8,15 @@ from aam.utilities import Result
 
 
 def get_all_organizations() -> list[Organization]:
-    organizations = Organization.query.all()
-    return organizations
+    return db.session.execute(db.select(Organization)).scalars().all()
 
 
 def get_organization_by_name(name: str) -> Optional[Organization]:
-    return Organization.query.filter_by(name=name).first()
+    return db.session.execute(db.select(Organization).filter_by(name=name)).scalar_one_or_none()
+
+
+def get_organization_by_id(org_id: int) -> Optional[Organization]:
+    return db.session.execute(db.select(Organization).filter_by(id=org_id)).scalar_one()
 
 
 def add_new_organization(json: dict) -> Result:
@@ -27,13 +30,14 @@ def add_new_organization(json: dict) -> Result:
 
 
 def delete_organization(json: dict) -> Result:
-    Organization.query.filter_by(id=json["id"]).delete()
+    organization = get_organization_by_id(json["id"])
+    db.session.delete(organization)
     db.session.commit()
     return Result(True, {})
 
 
 def edit_organization(record: dict) -> Result:
-    organization = Organization.query.filter_by(id=record["id"]).first()
+    organization = get_organization_by_id(record["id"])
     organization.name = record["name"]
     db.session.commit()
     return Result(True, {})
