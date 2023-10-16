@@ -40,7 +40,9 @@ def get_organizations() -> flask.Response:
 
 @app.route('/account', methods=["GET"])
 def account() -> flask.Response:
-    return html_response(render_template("account.html"))
+    organizations = aam.queries.organization.get_all_organizations()
+    organization_names = [org.name for org in organizations]
+    return html_response(render_template("account.html", organization_names=organization_names))
 
 
 @app.route('/account/data', methods=["GET", "POST", "PUT", "DELETE"])

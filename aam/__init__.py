@@ -1,6 +1,6 @@
 import jinja2
 
-from aam.db import db_instance
+from aam.db import db
 from aam.app import create_app
 
 app = create_app(debug=True)
@@ -19,6 +19,6 @@ app.app_context().push()
 from aam import views
 
 # Initialise database and create tables if not present.
-db_instance.init_app(app)
-db_instance.create_all()
-db_instance.session.commit()
+db.init_app(app)
+db.create_all()
+db.session.commit()
