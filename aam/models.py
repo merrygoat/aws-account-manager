@@ -58,7 +58,7 @@ class Account(db.Model, JsonMixin):
     account_id: Mapped[str] = mapped_column(String(12))
     name: Mapped[str] = mapped_column(String(150))
     organization_id: Mapped[int] = mapped_column(ForeignKey('organization.id'))
-    organization: Mapped[Organization] = relationship(back_populates="accounts", lazy="selectin")
+    organization: Mapped[Organization] = relationship(back_populates="accounts")
     account_status: Mapped[Enum] = mapped_column(Enum(AccountStatus))
     num_MFA_devices: Mapped[int] = mapped_column(Integer)
     email: Mapped[str] = mapped_column(String(150))
