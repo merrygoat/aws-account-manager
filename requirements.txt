@@ -1,3 +1,4 @@
 flask
 SQLAlchemy
+flask-sqlalchemy
 Jinja2
