@@ -1,4 +1,3 @@
-flask
-SQLAlchemy
-flask-sqlalchemy
-Jinja2
+peewee
+nicegui
+boto3
