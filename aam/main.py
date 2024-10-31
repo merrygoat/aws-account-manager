@@ -1,6 +1,8 @@
 import asyncio
 import datetime
+from cProfile import label
 
+import nicegui.events
 from nicegui import ui
 
 import aam.aws
@@ -10,23 +12,44 @@ ui_elements = {}
 
 @ui.page('/')
 def main():
+    grid_options = {'columnDefs': [
+        {'headerName': 'Name', 'field': 'name', 'checkboxSelection': True},
+        {'headerName': 'Account ID', 'field': 'id'},
+        {'headerName': 'Account Status', 'field': 'status'}
+    ]}
 
     with ui.row().classes('w-full no-wrap'):
         with ui.column().classes('w-2/3'):
-            ui_elements["grid"]  = ui.aggrid({"columnDefs": [
-                {'headerName': 'Name', 'field': 'name'},
-                {'headerName': 'Account ID', 'field': 'id'},
-                {'headerName': 'Account Status', 'field': 'status'}
-            ]})
+            ui_elements["grid"]  = ui.aggrid(grid_options)
         with ui.column().classes('w-1/3'):
             ui_elements["update_button"] = ui.button("Update Account Info", on_click=update_account_info)
             ui_elements["last_updated_label"] = ui.label()
+    with ui.grid(columns='100px auto').classes('w-full'):
+        ui.label("Name:").classes('place-content-center')
+        ui_elements["account_name"] = ui.label("")
+        ui.label("Account ID:").classes('place-content-center')
+        ui_elements["account_id"] = ui.label("")
+        ui.label("Account Status:").classes('place-content-center')
+        ui_elements["account_status"] = ui.label("")
+
+    ui_elements["grid"].on("RowSelected", update_details_window)
 
     update_last_updated_label()
     update_account_grid()
 
     ui.run()
 
+def update_details_window(event: nicegui.events.GenericEventArguments):
+    row_data = event.args['data']
+    if event.args["selected"] is True:
+        ui_elements["account_name"].set_text(row_data["name"])
+        ui_elements["account_id"].set_text(row_data["id"])
+        ui_elements["account_status"].set_text(row_data["status"])
+        ui.notify(f'Cell value: {event.args['data']['id']}')
+    elif event.args["selected"] is False and row_data['id'] == ui_elements["account_id"].text:
+        ui_elements["account_name"].set_text("")
+        ui_elements["account_id"].set_text("")
+        ui_elements["account_status"].set_text("")
 
 def update_last_updated_label():
     last_account_update = LastAccountUpdate.get_or_none(LastAccountUpdate.id == 0)
