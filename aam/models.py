@@ -12,6 +12,7 @@ class DictMixin:
 class Account(peewee.Model, DictMixin):
     id = peewee.CharField(primary_key=True)
     name = peewee.CharField()
+    email = peewee.CharField()
     status = peewee.CharField()
 
     class Meta:

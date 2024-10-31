@@ -12,11 +12,14 @@ ui_elements = {}
 
 @ui.page('/')
 def main():
-    grid_options = {'columnDefs': [
-        {'headerName': 'Name', 'field': 'name', 'checkboxSelection': True},
-        {'headerName': 'Account ID', 'field': 'id'},
-        {'headerName': 'Account Status', 'field': 'status'}
-    ]}
+    grid_options = {
+        'defaultColDef': {},
+        'columnDefs': [
+            {'headerName': 'Name', 'field': 'name', 'checkboxSelection': True},
+            {'headerName': 'Account ID', 'field': 'id'},
+            {'headerName': 'Root Email', 'field': 'email'},
+            {'headerName': 'Account Status', 'field': 'status'}
+        ]}
 
     with ui.row().classes('w-full no-wrap'):
         with ui.column().classes('w-2/3'):
@@ -29,6 +32,8 @@ def main():
         ui_elements["account_name"] = ui.label("")
         ui.label("Account ID:").classes('place-content-center')
         ui_elements["account_id"] = ui.label("")
+        ui.label("Root Email:").classes('place-content-center')
+        ui_elements["root_email"] = ui.label("")
         ui.label("Account Status:").classes('place-content-center')
         ui_elements["account_status"] = ui.label("")
 
@@ -44,11 +49,13 @@ def update_details_window(event: nicegui.events.GenericEventArguments):
     if event.args["selected"] is True:
         ui_elements["account_name"].set_text(row_data["name"])
         ui_elements["account_id"].set_text(row_data["id"])
+        ui_elements["root_email"].set_text(row_data["email"])
         ui_elements["account_status"].set_text(row_data["status"])
         ui.notify(f'Cell value: {event.args['data']['id']}')
     elif event.args["selected"] is False and row_data['id'] == ui_elements["account_id"].text:
         ui_elements["account_name"].set_text("")
         ui_elements["account_id"].set_text("")
+        ui_elements["root_email"].set_text("")
         ui_elements["account_status"].set_text("")
 
 def update_last_updated_label():
@@ -97,7 +104,7 @@ def get_and_process_account_info():
     # Loop through all account in AWS data, adding any that are not in the DB to the DB
     for account_id, account_details in account_info.items():
         if account_id not in db_accounts:
-            Account.create(id=account_details["Id"], name=account_details['Name'], status=account_details["Status"])
+            Account.create(id=account_details["Id"], name=account_details["Name"], email=account_details["Email"], status=account_details["Status"])
 
     LastAccountUpdate.replace(id=0, time=datetime.datetime.now()).execute()
 
