@@ -1,17 +1,21 @@
 import asyncio
 import datetime
-from cProfile import label
 
 import nicegui.events
 from nicegui import ui
 
 import aam.aws
-from aam.models import Account, LastAccountUpdate
+from aam.models import Account, LastAccountUpdate, Person, BudgetHolder
 
 ui_elements = {}
 
 @ui.page('/')
 def main():
+
+    people = [person for person in Account.select()]
+    if not people:
+        Person.create(first_name="Peter", last_name="Crowther", email="peter@internet.com")
+
     grid_options = {
         'defaultColDef': {},
         'columnDefs': [
@@ -27,7 +31,8 @@ def main():
         with ui.column().classes('w-1/3'):
             ui_elements["update_button"] = ui.button("Update Account Info", on_click=update_account_info)
             ui_elements["last_updated_label"] = ui.label()
-    with ui.grid(columns='100px auto').classes('w-full'):
+    ui.separator()
+    with ui.grid(columns='100px 200px').classes('w-full'):
         ui.label("Name:").classes('place-content-center')
         ui_elements["account_name"] = ui.label("")
         ui.label("Account ID:").classes('place-content-center')
@@ -36,13 +41,22 @@ def main():
         ui_elements["root_email"] = ui.label("")
         ui.label("Account Status:").classes('place-content-center')
         ui_elements["account_status"] = ui.label("")
+        ui.label("Budget Holder:").classes('place-content-center')
+        ui_elements["budget_holder"] = ui.select([]).props("clearable")
+    ui_elements["save_changes"] = ui.button("Save Changes", on_click=save_changes)
+    ui.button("Freeze", on_click=freeze)
 
     ui_elements["grid"].on("RowSelected", update_details_window)
 
+    ui_elements["budget_holder"].disable()
+    ui_elements["save_changes"].disable()
     update_last_updated_label()
     update_account_grid()
 
     ui.run()
+
+def freeze():
+    pass
 
 def update_details_window(event: nicegui.events.GenericEventArguments):
     row_data = event.args['data']
@@ -51,12 +65,27 @@ def update_details_window(event: nicegui.events.GenericEventArguments):
         ui_elements["account_id"].set_text(row_data["id"])
         ui_elements["root_email"].set_text(row_data["email"])
         ui_elements["account_status"].set_text(row_data["status"])
-        ui.notify(f'Cell value: {event.args['data']['id']}')
+        all_people = {person.id: person.full_name for person in Person.select()}
+        ui_elements["budget_holder"].set_options(all_people)
+        account = Account.get_or_none(Account.id == row_data["id"])
+        if account:
+            budget_holder = account.budget_holder.get_or_none()
+            if budget_holder:
+                ui_elements["budget_holder"].set_value(budget_holder.person.id)
+            else:
+                ui_elements["budget_holder"].set_value(None)
+        else:
+            ui_elements["budget_holder"].set_value(None)
+        ui_elements["budget_holder"].enable()
+        ui_elements["save_changes"].enable()
     elif event.args["selected"] is False and row_data['id'] == ui_elements["account_id"].text:
         ui_elements["account_name"].set_text("")
         ui_elements["account_id"].set_text("")
         ui_elements["root_email"].set_text("")
         ui_elements["account_status"].set_text("")
+        ui_elements["budget_holder"].set_value(None)
+        ui_elements["budget_holder"].disable()
+        ui_elements["save_changes"].disable()
 
 def update_last_updated_label():
     last_account_update = LastAccountUpdate.get_or_none(LastAccountUpdate.id == 0)
@@ -72,6 +101,16 @@ def update_account_grid():
     ui_elements["grid"].options["rowData"] = [account.to_dict() for account in accounts]
     ui_elements["grid"].update()
 
+
+def save_changes():
+    account = Account.get(Account.id==ui_elements["account_id"].text)
+    new_budget_holder = ui_elements["budget_holder"].value
+    if new_budget_holder:
+        new_budget_holder = Person.get(Person.id == new_budget_holder)
+        BudgetHolder.create(person=new_budget_holder, account=account)
+    else:
+        account.budget_holder.get().delete_instance()
+    ui.notify("Record updated.")
 
 async def update_account_info():
     with ui.dialog() as loadingDialog:
