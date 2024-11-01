@@ -43,6 +43,10 @@ def main():
         ui_elements["account_status"] = ui.label("")
         ui.label("Budget Holder:").classes('place-content-center')
         ui_elements["budget_holder"] = ui.select([]).props("clearable")
+        ui.label("Finance Code:")
+        ui_elements["finance_code"] = ui.input()
+        ui.label("Task Code:")
+        ui_elements["task_code"] = ui.input()
     ui_elements["save_changes"] = ui.button("Save Changes", on_click=save_changes)
     ui.button("Freeze", on_click=freeze)
 
@@ -111,6 +115,8 @@ def save_changes():
     else:
         account.budget_holder.get().delete_instance()
     ui.notify("Record updated.")
+    account.finance_code = ui_elements["finance_code"].value
+    account.task_code = ui_elements["finance_code"].value
 
 async def update_account_info():
     with ui.dialog() as loadingDialog:

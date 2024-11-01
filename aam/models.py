@@ -31,6 +31,8 @@ class Account(BaseModel, DictMixin):
     name = peewee.CharField()
     email = peewee.CharField()
     status = peewee.CharField()
+    finance_code = peewee.CharField(null=True)
+    task_code = peewee.CharField(null=True)
 
 class BudgetHolder(BaseModel):
     id = peewee.AutoField()
