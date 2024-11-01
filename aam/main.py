@@ -1,20 +1,23 @@
 import asyncio
 import datetime
+from functools import partial
 
 import nicegui.events
 from nicegui import ui
 
 import aam.aws
-from aam.models import Account, LastAccountUpdate, Person, BudgetHolder
+from aam.models import Account, LastAccountUpdate, Person, Sysadmin
 
 ui_elements = {}
 
 @ui.page('/')
 def main():
 
-    people = [person for person in Account.select()]
+    people = [person for person in Person.select()]
     if not people:
         Person.create(first_name="Peter", last_name="Crowther", email="peter@internet.com")
+        Person.create(first_name="Felix", last_name="Edelsten", email="felix@internet.com")
+        Person.create(first_name="Connor", last_name="Main", email="connor@internet.com")
 
     grid_options = {
         'defaultColDef': {},
@@ -32,27 +35,34 @@ def main():
             ui_elements["update_button"] = ui.button("Update Account Info", on_click=update_account_info)
             ui_elements["last_updated_label"] = ui.label()
     ui.separator()
-    with ui.grid(columns='100px 200px').classes('w-full'):
-        ui.label("Name:").classes('place-content-center')
+    with ui.grid(columns='120px 200px').classes('w-full'):
+        ui.label("Name:")
         ui_elements["account_name"] = ui.label("")
-        ui.label("Account ID:").classes('place-content-center')
+        ui.label("Account ID:")
         ui_elements["account_id"] = ui.label("")
-        ui.label("Root Email:").classes('place-content-center')
+        ui.label("Root Email:")
         ui_elements["root_email"] = ui.label("")
-        ui.label("Account Status:").classes('place-content-center')
+        ui.label("Account Status:")
         ui_elements["account_status"] = ui.label("")
-        ui.label("Budget Holder:").classes('place-content-center')
-        ui_elements["budget_holder"] = ui.select([]).props("clearable")
+        ui.label("Budget Holder:")
+        ui_elements["budget_holder"] = ui.select([], on_change=partial(update_email, "budget_holder")).props("clearable")
+        ui.label("Budget Holder email:")
+        ui_elements["budget_holder_email"] = ui.label("")
         ui.label("Finance Code:")
-        ui_elements["finance_code"] = ui.input()
+        ui_elements["finance_code"] = ui.input().props("clearable")
         ui.label("Task Code:")
-        ui_elements["task_code"] = ui.input()
+        ui_elements["task_code"] = ui.input().props("clearable")
+        ui.label("Sysadmin:")
+        ui_elements["sysadmin"] = ui.select([], on_change=partial(update_email, "sysadmin")).props("clearable")
+        ui.label("Sysadmin email:")
+        ui_elements["sysadmin_email"] = ui.label("")
+
     ui_elements["save_changes"] = ui.button("Save Changes", on_click=save_changes)
     ui.button("Freeze", on_click=freeze)
 
     ui_elements["grid"].on("RowSelected", update_details_window)
 
-    ui_elements["budget_holder"].disable()
+    ui_elements["sysadmin"].disable()
     ui_elements["save_changes"].disable()
     update_last_updated_label()
     update_account_grid()
@@ -62,33 +72,59 @@ def main():
 def freeze():
     pass
 
+def update_email(email_type: str, event: nicegui.events.ValueChangeEventArguments):
+    selected_sysadmin = event.sender.value
+    if selected_sysadmin:
+        person = Person.get(id=selected_sysadmin)
+        ui_elements[f"{email_type}_email"].set_text(person.email)
+    else:
+        ui_elements[f"{email_type}_email"].set_text("")
+
 def update_details_window(event: nicegui.events.GenericEventArguments):
     row_data = event.args['data']
     if event.args["selected"] is True:
+        ui_elements["sysadmin"].enable()
+        ui_elements["budget_holder"].enable()
+        ui_elements["save_changes"].enable()
+
         ui_elements["account_name"].set_text(row_data["name"])
         ui_elements["account_id"].set_text(row_data["id"])
         ui_elements["root_email"].set_text(row_data["email"])
         ui_elements["account_status"].set_text(row_data["status"])
         all_people = {person.id: person.full_name for person in Person.select()}
-        ui_elements["budget_holder"].set_options(all_people)
         account = Account.get_or_none(Account.id == row_data["id"])
+
+        ui_elements["budget_holder"].set_options(all_people)
+        ui_elements["finance_code"].set_value(account.finance_code)
+        ui_elements["task_code"].set_value(account.task_code)
+        ui_elements["sysadmin"].set_options(all_people)
         if account:
-            budget_holder = account.budget_holder.get_or_none()
-            if budget_holder:
-                ui_elements["budget_holder"].set_value(budget_holder.person.id)
+            if account.budget_holder:
+                ui_elements["budget_holder"].set_value(account.budget_holder.id)
             else:
                 ui_elements["budget_holder"].set_value(None)
+
+            sysadmin = account.sysadmin.get_or_none()
+            if sysadmin:
+                ui_elements["sysadmin"].set_value(sysadmin.person.id)
+            else:
+                ui_elements["sysadmin"].set_value(None)
         else:
-            ui_elements["budget_holder"].set_value(None)
-        ui_elements["budget_holder"].enable()
-        ui_elements["save_changes"].enable()
+            ui_elements["sysadmin"].set_value(None)
+            ui_elements["sysadmin"].set_value(None)
     elif event.args["selected"] is False and row_data['id'] == ui_elements["account_id"].text:
         ui_elements["account_name"].set_text("")
         ui_elements["account_id"].set_text("")
         ui_elements["root_email"].set_text("")
         ui_elements["account_status"].set_text("")
         ui_elements["budget_holder"].set_value(None)
+        ui_elements["budget_holder_email"].set_text("")
+        ui_elements["finance_code"].set_value(None)
+        ui_elements["task_code"].set_value(None)
+        ui_elements["sysadmin"].set_value(None)
+        ui_elements["sysadmin_email"].set_text("")
         ui_elements["budget_holder"].disable()
+        ui_elements["sysadmin"].disable()
         ui_elements["save_changes"].disable()
 
 def update_last_updated_label():
@@ -108,15 +144,22 @@ def update_account_grid():
 
 def save_changes():
     account = Account.get(Account.id==ui_elements["account_id"].text)
-    new_budget_holder = ui_elements["budget_holder"].value
-    if new_budget_holder:
-        new_budget_holder = Person.get(Person.id == new_budget_holder)
-        BudgetHolder.create(person=new_budget_holder, account=account)
+    selected_sysadmin = ui_elements["sysadmin"].value
+    if selected_sysadmin:
+        selected_sysadmin = Person.get(Person.id == selected_sysadmin)
+        Sysadmin.create(person=selected_sysadmin, account=account)
     else:
-        account.budget_holder.get().delete_instance()
+        account.sysadmin.get().delete_instance()
+    selected_budgetholder = ui_elements["budget_holder"].value
+    if selected_budgetholder:
+        selected_budgetholder = Person.get(Person.id == selected_budgetholder)
+        account.budget_holder = selected_budgetholder
+    else:
+        account.budget_holder = None
     ui.notify("Record updated.")
     account.finance_code = ui_elements["finance_code"].value
     account.task_code = ui_elements["finance_code"].value
+    account.save()
 
 async def update_account_info():
     with ui.dialog() as loadingDialog:

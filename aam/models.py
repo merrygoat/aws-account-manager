@@ -31,13 +31,14 @@ class Account(BaseModel, DictMixin):
     name = peewee.CharField()
     email = peewee.CharField()
     status = peewee.CharField()
+    budget_holder = peewee.ForeignKeyField(Person, backref="budget_holder", null=True)
     finance_code = peewee.CharField(null=True)
     task_code = peewee.CharField(null=True)
 
-class BudgetHolder(BaseModel):
+class Sysadmin(BaseModel):
     id = peewee.AutoField()
-    person = peewee.ForeignKeyField(Person, backref="budget_holder")
-    account = peewee.ForeignKeyField(Account, backref="budget_holder")
+    person = peewee.ForeignKeyField(Person, backref="sysadmin")
+    account = peewee.ForeignKeyField(Account, backref="sysadmin")
 
     @property
     def full_name(self) -> str:
@@ -48,6 +49,4 @@ class LastAccountUpdate(BaseModel):
     time = peewee.DateTimeField()
 
 
-db.create_tables([Account, LastAccountUpdate, Person, BudgetHolder])
-
-
+db.create_tables([Account, LastAccountUpdate, Person, Sysadmin])
