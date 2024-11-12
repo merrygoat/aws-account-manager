@@ -48,5 +48,10 @@ class LastAccountUpdate(BaseModel):
     id = peewee.IntegerField(primary_key=True)
     time = peewee.DateTimeField()
 
+class Note(BaseModel):
+    id = peewee.AutoField()
+    date = peewee.DateField()
+    text = peewee.CharField()
+    account_id = peewee.ForeignKeyField(Account, backref="notes")
 
-db.create_tables([Account, LastAccountUpdate, Person, Sysadmin])
+db.create_tables([Account, LastAccountUpdate, Person, Sysadmin, Note])

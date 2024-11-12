@@ -6,7 +6,8 @@ import nicegui.events
 from nicegui import ui
 
 import aam.aws
-from aam.models import Account, LastAccountUpdate, Person, Sysadmin
+from aam import note_dialog
+from aam.models import Account, LastAccountUpdate, Person, Sysadmin, Note
 
 ui_elements = {}
 
@@ -35,39 +36,77 @@ def main():
             ui_elements["update_button"] = ui.button("Update Account Info", on_click=update_account_info)
             ui_elements["last_updated_label"] = ui.label()
     ui.separator()
-    with ui.grid(columns='120px 200px').classes('w-full'):
-        ui.label("Name:")
-        ui_elements["account_name"] = ui.label("")
-        ui.label("Account ID:")
-        ui_elements["account_id"] = ui.label("")
-        ui.label("Root Email:")
-        ui_elements["root_email"] = ui.label("")
-        ui.label("Account Status:")
-        ui_elements["account_status"] = ui.label("")
-        ui.label("Budget Holder:")
-        ui_elements["budget_holder"] = ui.select([], on_change=partial(update_email, "budget_holder")).props("clearable")
-        ui.label("Budget Holder email:")
-        ui_elements["budget_holder_email"] = ui.label("")
-        ui.label("Finance Code:")
-        ui_elements["finance_code"] = ui.input().props("clearable")
-        ui.label("Task Code:")
-        ui_elements["task_code"] = ui.input().props("clearable")
-        ui.label("Sysadmin:")
-        ui_elements["sysadmin"] = ui.select([], on_change=partial(update_email, "sysadmin")).props("clearable")
-        ui.label("Sysadmin email:")
-        ui_elements["sysadmin_email"] = ui.label("")
+
+    with ui.row().classes('w-full no-wrap'):
+        with ui.column().classes('w-1/2'):
+            ui.html("Account Details").classes("text-2xl")
+            with ui.grid(columns='auto 1fr').classes('w-full'):
+                ui.label("Name:")
+                ui_elements["account_name"] = ui.label("")
+                ui.label("Account ID:")
+                ui_elements["account_id"] = ui.label("")
+                ui.label("Root Email:")
+                ui_elements["root_email"] = ui.label("")
+                ui.label("Account Status:")
+                ui_elements["account_status"] = ui.label("")
+                ui.html("Billing/Contact Details").classes("text-2xl")
+                ui.element()
+                ui.label("Budget Holder:")
+                ui_elements["budget_holder"] = ui.select([], on_change=partial(update_email, "budget_holder")).props("clearable outlined")
+                ui.label("Budget Holder email:")
+                ui_elements["budget_holder_email"] = ui.label("")
+                ui.label("Finance Code:")
+                ui_elements["finance_code"] = ui.input().props("clearable outlined")
+                ui.label("Task Code:")
+                ui_elements["task_code"] = ui.input().props("clearable outlined ")
+                ui.label("Sysadmin:")
+                ui_elements["sysadmin"] = ui.select([], on_change=partial(update_email, "sysadmin")).props("clearable outlined")
+                ui.label("Sysadmin email:")
+                ui_elements["sysadmin_email"] = ui.label("")
+        with ui.column().classes('w-1/2'):
+            ui.html("Notes").classes("text-xl")
+            ui_elements["notes_grid"] = ui.aggrid({
+                'columnDefs': [{"headerName": "Date", "field": "date"},
+                               {"headerName": "Note", "field": "text"}],
+                'rowData': {},
+                'rowSelection': 'multiple',
+                'stopEditingWhenCellsLoseFocus': True,
+            })
+            note_dialog.add_note_dialog(ui_elements)
+            with ui.row():
+                ui.button('Add note', on_click=lambda: ui_elements["note_dialog"].open())
 
     ui_elements["save_changes"] = ui.button("Save Changes", on_click=save_changes)
     ui.button("Freeze", on_click=freeze)
 
-    ui_elements["grid"].on("RowSelected", update_details_window)
+    ui_elements["grid"].on("RowSelected", account_selected)
 
+    ui_elements["budget_holder"].disable()
     ui_elements["sysadmin"].disable()
+    ui_elements["finance_code"].disable()
+    ui_elements["task_code"].disable()
     ui_elements["save_changes"].disable()
     update_last_updated_label()
     update_account_grid()
 
     ui.run()
+
+# def add_row():
+#     new_id = max((dx['id'] for dx in rows), default=-1) + 1
+#     rows.append({'id': new_id, 'name': ''})
+#     ui.notify(f'Added row with ID {new_id}')
+#     ui_elements["notes_grid"].update()
+#
+# def handle_cell_value_change(e):
+#     new_row = e.args['data']
+#     ui.notify(f'Updated row to: {e.args["data"]}')
+#     rows[:] = [row | new_row if row['id'] == new_row['id'] else row for row in rows]
+#
+# async def delete_selected():
+#     selected_id = [row['id'] for row in await ui_elements["notes_grid"].get_selected_rows()]
+#     rows[:] = [row for row in rows if row['id'] not in selected_id]
+#     ui.notify(f'Deleted row with ID {selected_id}')
+#     ui_elements["notes_grid"].update()
 
 def freeze():
     pass
@@ -80,12 +119,14 @@ def update_email(email_type: str, event: nicegui.events.ValueChangeEventArgument
     else:
         ui_elements[f"{email_type}_email"].set_text("")
 
-def update_details_window(event: nicegui.events.GenericEventArguments):
+def account_selected(event: nicegui.events.GenericEventArguments):
     row_data = event.args['data']
     if event.args["selected"] is True:
         ui_elements["sysadmin"].enable()
         ui_elements["budget_holder"].enable()
         ui_elements["save_changes"].enable()
+        ui_elements["finance_code"].enable()
+        ui_elements["task_code"].enable()
 
         ui_elements["account_name"].set_text(row_data["name"])
         ui_elements["account_id"].set_text(row_data["id"])
@@ -112,6 +153,14 @@ def update_details_window(event: nicegui.events.GenericEventArguments):
         else:
             ui_elements["sysadmin"].set_value(None)
             ui_elements["sysadmin"].set_value(None)
+        notes = [note for note in Note.select().where(Note.account_id == account.id)]
+        if notes:
+            notes = [{"date": note.date, "text": note.text} for note in notes]
+        else:
+            notes = []
+        ui_elements["notes_grid"].options["rowData"] = notes
+        ui_elements["notes_grid"].update()
+
     elif event.args["selected"] is False and row_data['id'] == ui_elements["account_id"].text:
         ui_elements["account_name"].set_text("")
         ui_elements["account_id"].set_text("")
@@ -123,9 +172,12 @@ def update_details_window(event: nicegui.events.GenericEventArguments):
         ui_elements["task_code"].set_value(None)
         ui_elements["sysadmin"].set_value(None)
         ui_elements["sysadmin_email"].set_text("")
+        ui_elements["finance_code"].disable()
+        ui_elements["task_code"].disable()
         ui_elements["budget_holder"].disable()
         ui_elements["sysadmin"].disable()
         ui_elements["save_changes"].disable()
+
 
 def update_last_updated_label():
     last_account_update = LastAccountUpdate.get_or_none(LastAccountUpdate.id == 0)
@@ -158,7 +210,7 @@ def save_changes():
         account.budget_holder = None
     ui.notify("Record updated.")
     account.finance_code = ui_elements["finance_code"].value
-    account.task_code = ui_elements["finance_code"].value
+    account.task_code = ui_elements["task_code"].value
     account.save()
 
 async def update_account_info():
