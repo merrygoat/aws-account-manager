@@ -66,20 +66,26 @@ def main():
         with ui.column().classes('w-1/2'):
             ui.html("Notes").classes("text-xl")
             ui_elements["notes_grid"] = ui.aggrid({
-                'columnDefs': [{"headerName": "Date", "field": "date"},
+                'columnDefs': [{"headerName": "id", "field": "id", "hide": True},
+                               {"headerName": "Date", "field": "date"},
                                {"headerName": "Note", "field": "text"}],
                 'rowData': {},
                 'rowSelection': 'multiple',
                 'stopEditingWhenCellsLoseFocus': True,
             })
             note_dialog.add_note_dialog(ui_elements)
+            note_dialog.edit_note_dialog(ui_elements)
             with ui.row():
                 ui.button('Add note', on_click=lambda: ui_elements["note_dialog"].open())
+                ui.button('Edit note', on_click=partial(note_dialog.open_edit_note_dialog, ui_elements))
+
 
     ui_elements["save_changes"] = ui.button("Save Changes", on_click=save_changes)
     ui.button("Freeze", on_click=freeze)
 
     ui_elements["grid"].on("RowSelected", account_selected)
+    ui_elements["notes_grid"].on("RowDoubleClick", lambda event: ui.notify(event))
+
 
     ui_elements["budget_holder"].disable()
     ui_elements["sysadmin"].disable()
@@ -91,22 +97,6 @@ def main():
 
     ui.run()
 
-# def add_row():
-#     new_id = max((dx['id'] for dx in rows), default=-1) + 1
-#     rows.append({'id': new_id, 'name': ''})
-#     ui.notify(f'Added row with ID {new_id}')
-#     ui_elements["notes_grid"].update()
-#
-# def handle_cell_value_change(e):
-#     new_row = e.args['data']
-#     ui.notify(f'Updated row to: {e.args["data"]}')
-#     rows[:] = [row | new_row if row['id'] == new_row['id'] else row for row in rows]
-#
-# async def delete_selected():
-#     selected_id = [row['id'] for row in await ui_elements["notes_grid"].get_selected_rows()]
-#     rows[:] = [row for row in rows if row['id'] not in selected_id]
-#     ui.notify(f'Deleted row with ID {selected_id}')
-#     ui_elements["notes_grid"].update()
 
 def freeze():
     pass
@@ -155,7 +145,7 @@ def account_selected(event: nicegui.events.GenericEventArguments):
             ui_elements["sysadmin"].set_value(None)
         notes = [note for note in Note.select().where(Note.account_id == account.id)]
         if notes:
-            notes = [{"date": note.date, "text": note.text} for note in notes]
+            notes = [{"id": note.id, "date": note.date, "text": note.text} for note in notes]
         else:
             notes = []
         ui_elements["notes_grid"].options["rowData"] = notes
