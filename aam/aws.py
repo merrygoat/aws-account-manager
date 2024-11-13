@@ -12,7 +12,7 @@ def get_accounts(sso_profile_name: str) -> list[dict]:
 
 def get_organisation_accounts(org_client: Type[botocore.client.BaseClient],
                               include_suspended: bool = True) -> list[dict]:
-    """Get a list of accounts in the organisation."""
+    """Get a list of accounts in the organization."""
     response = org_client.list_accounts()
     accounts = response["Accounts"]
     while "NextToken" in response:

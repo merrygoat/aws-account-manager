@@ -35,30 +35,6 @@ class MainForm:
             with ui.column().classes('w-1/2'):
                 self.notes = AccountNotes(self)
 
-        self.save_changes = ui.button("Save Changes", on_click=self.save_account_changes)
-        self.freeze = ui.button("Freeze", on_click=freeze)
-
-        self.save_changes.disable()
-
-    def save_account_changes(self):
-        account = Account.get(Account.id == self.account_details.account_id.text)
-        selected_sysadmin = self.account_details.sysadmin.value
-        if selected_sysadmin:
-            selected_sysadmin = Person.get(Person.id == selected_sysadmin)
-            Sysadmin.create(person=selected_sysadmin, account=account)
-        else:
-            account.sysadmin.get().delete_instance()
-        selected_budgetholder = self.account_details.budget_holder.value
-        if selected_budgetholder:
-            selected_budgetholder = Person.get(Person.id == selected_budgetholder)
-            account.budget_holder = selected_budgetholder
-        else:
-            account.budget_holder = None
-        ui.notify("Record updated.")
-        account.finance_code = self.account_details.finance_code.value
-        account.task_code = self.account_details.task_code.value
-        account.save()
-
 
 class AccountDetails:
     def __init__(self, parent: MainForm):
@@ -91,10 +67,33 @@ class AccountDetails:
             ui.label("Sysadmin email:")
             self.sysadmin_email = ui.label("")
 
+        self.save_changes = ui.button("Save Changes", on_click=self.save_account_changes)
+        self.freeze = ui.button("Freeze", on_click=freeze)
+
         self.budget_holder.disable()
         self.sysadmin.disable()
         self.finance_code.disable()
         self.task_code.disable()
+        self.save_changes.disable()
+
+    def save_account_changes(self):
+        account = Account.get(Account.id == self.account_id.text)
+        selected_sysadmin = self.sysadmin.value
+        if selected_sysadmin:
+            selected_sysadmin = Person.get(Person.id == selected_sysadmin)
+            Sysadmin.create(person=selected_sysadmin, account=account)
+        else:
+            account.sysadmin.get().delete_instance()
+        selected_budgetholder = self.budget_holder.value
+        if selected_budgetholder:
+            selected_budgetholder = Person.get(Person.id == selected_budgetholder)
+            account.budget_holder = selected_budgetholder
+        else:
+            account.budget_holder = None
+        ui.notify("Record updated.")
+        account.finance_code = self.finance_code.value
+        account.task_code = self.task_code.value
+        account.save()
 
     def update_sysadmin_email(self, event: nicegui.events.ValueChangeEventArguments):
         selected_person = event.sender.value
@@ -127,12 +126,14 @@ class AccountDetails:
         self.task_code.disable()
         self.budget_holder.disable()
         self.sysadmin.disable()
+        self.save_changes.disable()
 
     def update(self, account_info: dict):
         self.sysadmin.enable()
         self.budget_holder.enable()
         self.finance_code.enable()
         self.task_code.enable()
+        self.save_changes.enable()
 
         self.account_name.set_text(account_info["account_name"])
         self.account_id.set_text(account_info["id"])
@@ -215,7 +216,6 @@ class AccountList:
     def account_selected(self, event: nicegui.events.GenericEventArguments):
         row_data = event.args['data']
         if event.args["selected"] is True:
-            self.parent.save_changes.enable()
 
             account = Account.get_or_none(Account.id == row_data["id"])
 
@@ -231,7 +231,6 @@ class AccountList:
 
         elif event.args["selected"] is False and row_data['id'] == self.parent.account_details.account_id.text:
             self.parent.account_details.clear()
-            self.parent.save_changes.disable()
 
     async def update_account_info(self):
         with ui.dialog() as loadingDialog:
