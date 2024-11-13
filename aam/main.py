@@ -26,14 +26,15 @@ def main():
 class MainForm:
     def __init__(self):
         with ui.row().classes('w-full no-wrap'):
-            self.account_grid = AccountList(self)
+            self.account_grid = AccountSelect(self)
         ui.separator()
 
         with ui.row().classes('w-full no-wrap'):
-            with ui.column().classes('w-1/2'):
+            with ui.column().classes('w-1/3'):
                 self.account_details = AccountDetails(self)
-            with ui.column().classes('w-1/2'):
                 self.notes = AccountNotes(self)
+            with ui.column().classes('w-2/3'):
+                ui.html("Money").classes("text-2xl")
 
 
 class AccountDetails:
@@ -66,9 +67,8 @@ class AccountDetails:
                 "clearable outlined")
             ui.label("Sysadmin email:")
             self.sysadmin_email = ui.label("")
-
-        self.save_changes = ui.button("Save Changes", on_click=self.save_account_changes)
-        self.freeze = ui.button("Freeze", on_click=freeze)
+        with ui.column().classes("items-end w-full"):
+            self.save_changes = ui.button("Save Changes", on_click=self.save_account_changes)
 
         self.budget_holder.disable()
         self.sysadmin.disable()
@@ -127,39 +127,38 @@ class AccountDetails:
         self.budget_holder.disable()
         self.sysadmin.disable()
         self.save_changes.disable()
+        self.parent.notes.clear()
 
-    def update(self, account_info: dict):
+    def update(self, account: Account):
         self.sysadmin.enable()
         self.budget_holder.enable()
         self.finance_code.enable()
         self.task_code.enable()
         self.save_changes.enable()
 
-        self.account_name.set_text(account_info["account_name"])
-        self.account_id.set_text(account_info["id"])
-        self.root_email.set_text(account_info["email"])
-        self.account_status.set_text(account_info["status"])
+        self.account_name.set_text(account.name)
+        self.account_id.set_text(account.id)
+        self.root_email.set_text(account.email)
+        self.account_status.set_text(account.status)
 
         all_people = {person.id: person.full_name for person in Person.select()}
         self.budget_holder.set_options(all_people)
         self.sysadmin.set_options(all_people)
 
-        selected_account = account_info["account"]
-        self.finance_code.set_value(selected_account.finance_code)
-        self.task_code.set_value(selected_account.task_code)
-        if selected_account:
-            if selected_account.budget_holder:
-                self.budget_holder.set_value(selected_account.budget_holder.id)
-            else:
-                self.budget_holder.set_value(None)
+        self.finance_code.set_value(account.finance_code)
+        self.task_code.set_value(account.task_code)
 
-            sysadmin = selected_account.sysadmin.get_or_none()
-            if sysadmin:
-                self.sysadmin.set_value(sysadmin.person.id)
-            else:
-                self.sysadmin.set_value(None)
+        if account.budget_holder:
+            self.budget_holder.set_value(account.budget_holder.id)
+        else:
+            self.budget_holder.set_value(None)
+
+        sysadmin = account.sysadmin.get_or_none()
+        if sysadmin:
+            self.sysadmin.set_value(sysadmin.person.id)
         else:
             self.sysadmin.set_value(None)
+
 
 
 class AccountNotes:
@@ -189,48 +188,33 @@ class AccountNotes:
         self.notes_grid.options["rowData"] = notes
         self.notes_grid.update()
 
+    def clear(self):
+        self.notes_grid.options["rowData"] = {}
+        self.notes_grid.update()
 
-class AccountList:
+
+class AccountSelect:
     def __init__(self, parent: MainForm):
         self.parent = parent
 
-        grid_options = {
-            'defaultColDef': {},
-            'columnDefs': [
-                {'headerName': 'Name', 'field': 'name', 'checkboxSelection': True},
-                {'headerName': 'Account ID', 'field': 'id'},
-                {'headerName': 'Root Email', 'field': 'email'},
-                {'headerName': 'Account Status', 'field': 'status'}
-            ]}
+        accounts = {account.id: f"{account.name} ({account.id}) - {account.status}" for account in Account.select()}
 
-        with ui.column().classes('w-2/3'):
-            self.grid = ui.aggrid(grid_options)
-        with ui.column().classes('w-1/3'):
-            self.update_button = ui.button("Update Account Info", on_click=self.update_account_info)
-            self.last_updated = ui.label()
+        with ui.row():
+            self.account_select = ui.select(label="Account", options=accounts, on_change=self.account_selected).classes("min-w-[400px]").props('popup-content-class="!max-h-[200px]')
+            with ui.column():
+                self.update_button = ui.button("Update Account Info", on_click=self.update_account_info)
+                self.last_updated = ui.label()
 
-        self.grid.on("RowSelected", self.account_selected)
         self.update_last_updated_label()
-        self.update_account_grid()
 
-    def account_selected(self, event: nicegui.events.GenericEventArguments):
-        row_data = event.args['data']
-        if event.args["selected"] is True:
 
-            account = Account.get_or_none(Account.id == row_data["id"])
+    def account_selected(self, event: nicegui.events.ValueChangeEventArguments):
+        selected_account_id = event.sender.value
+        account = Account.get_or_none(Account.id == selected_account_id)
 
-            account_info = {"account_name": row_data["name"],
-                            "id": row_data["id"],
-                            "email": row_data["email"],
-                            "status": row_data["status"],
-                            "account": account}
+        self.parent.account_details.update(account)
+        self.parent.notes.update_note_grid(account)
 
-            self.parent.account_details.update(account_info)
-
-            self.parent.notes.update_note_grid(account)
-
-        elif event.args["selected"] is False and row_data['id'] == self.parent.account_details.account_id.text:
-            self.parent.account_details.clear()
 
     async def update_account_info(self):
         with ui.dialog() as loadingDialog:
@@ -240,7 +224,6 @@ class AccountList:
         await asyncio.to_thread(get_and_process_account_info)
 
         self.update_last_updated_label()
-        self.update_account_grid()
 
         loadingDialog.close()
 
@@ -252,10 +235,6 @@ class AccountList:
         else:
             self.last_updated.set_text(f"Account information last updated: None")
 
-    def update_account_grid(self):
-        accounts = [account for account in Account.select()]
-        self.grid.options["rowData"] = [account.to_dict() for account in accounts]
-        self.grid.update()
 
 def freeze():
     pass
