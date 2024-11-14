@@ -1,3 +1,4 @@
 peewee
 nicegui
 boto3
+python-dateutil

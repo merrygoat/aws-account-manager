@@ -3,10 +3,11 @@ import datetime
 
 import nicegui.events
 from nicegui import ui
+from dateutil import rrule, parser
 
 import aam.aws
 from aam import note_dialog
-from aam.models import Account, LastAccountUpdate, Person, Sysadmin, Note
+from aam.models import Account, LastAccountUpdate, Person, Sysadmin, Note, Month
 
 
 @ui.page('/')
@@ -35,6 +36,32 @@ class MainForm:
                 self.notes = AccountNotes(self)
             with ui.column().classes('w-2/3'):
                 ui.html("Money").classes("text-2xl")
+                self.months = Months(self)
+
+class Months:
+    def __init__(self, parent: MainForm):
+        self.parent = parent
+
+        self.month_grid = ui.aggrid({
+            'columnDefs': [{"headerName": "id", "field": "id", "hide": True},
+                           {"headerName": "Month", "field": "month", "cellDataType": "dateString"},
+                           {"headerName": "Exchange rate £/$", "field": "exchange_rate", "editable": True}],
+            'rowData': {},
+            'rowSelection': 'multiple',
+            'stopEditingWhenCellsLoseFocus': True,
+        })
+        months = [{"id": month.id, "month": month.date, "exchange_rate": month.exchange_rate} for month in Month]
+        self.month_grid.on("cellValueChanged", self.update_exchange_rate)
+        self.month_grid.options["rowData"] = months
+        self.month_grid.update()
+
+    @staticmethod
+    def update_exchange_rate(event: nicegui.events.GenericEventArguments):
+        month_id = event.args["data"]["id"]
+        month = Month.get(id=month_id)
+        month.exchange_rate = event.args["data"]["exchange_rate"]
+        month.save()
+
 
 
 class AccountDetails:

@@ -34,6 +34,7 @@ class Account(BaseModel, DictMixin):
     budget_holder = peewee.ForeignKeyField(Person, backref="budget_holder", null=True)
     finance_code = peewee.CharField(null=True)
     task_code = peewee.CharField(null=True)
+    billing_start = peewee.DateField(null=True)
 
 class Sysadmin(BaseModel):
     id = peewee.AutoField()
@@ -54,4 +55,22 @@ class Note(BaseModel):
     text = peewee.CharField()
     account_id = peewee.ForeignKeyField(Account, backref="notes")
 
-db.create_tables([Account, LastAccountUpdate, Person, Sysadmin, Note])
+class Month(BaseModel):
+    id = peewee.AutoField()
+    date = peewee.DateField()
+    exchange_rate = peewee.DecimalField()
+
+class Bill(BaseModel):
+    id = peewee.AutoField()
+    account_id = peewee.ForeignKeyField(Account, backref="bills")
+    month = peewee.ForeignKeyField(Month, backref="bills")
+    usage = peewee.DecimalField()
+    support_eligible = peewee.BooleanField()
+
+class Recharge(BaseModel):
+    id = peewee.AutoField()
+    account_id = peewee.ForeignKeyField(Account, backref="recharges")
+    month = peewee.ForeignKeyField(Month, backref="recharges")
+
+
+db.create_tables([Account, LastAccountUpdate, Person, Sysadmin, Note, Month, Bill, Recharge])
