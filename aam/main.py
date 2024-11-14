@@ -94,6 +94,14 @@ class AccountDetails:
                 "clearable outlined")
             ui.label("Sysadmin email:")
             self.sysadmin_email = ui.label("")
+            ui.label("Billing start")
+            with ui.input('Date') as self.billing_start:
+                with ui.menu().props('no-parent-event') as menu:
+                    with ui.date(mask="DD-MM-YY").bind_value(self.billing_start):
+                        with ui.row().classes('justify-end'):
+                            ui.button('Close', on_click=menu.close).props('flat')
+                with self.billing_start.add_slot('append'):
+                    ui.icon('edit_calendar').on('click', menu.open).classes('cursor-pointer')
         with ui.column().classes("items-end w-full"):
             self.save_changes = ui.button("Save Changes", on_click=self.save_account_changes)
 
@@ -120,6 +128,7 @@ class AccountDetails:
         ui.notify("Record updated.")
         account.finance_code = self.finance_code.value
         account.task_code = self.task_code.value
+        account.billing_start = self.billing_start.value
         account.save()
 
     def update_sysadmin_email(self, event: nicegui.events.ValueChangeEventArguments):
@@ -186,6 +195,11 @@ class AccountDetails:
         else:
             self.sysadmin.set_value(None)
 
+        if account.billing_start:
+            self.billing_start.value = account.billing_start
+        else:
+            self.billing_start.value = ""
+
 
 
 class AccountNotes:
@@ -227,7 +241,7 @@ class AccountSelect:
         accounts = {account.id: f"{account.name} ({account.id}) - {account.status}" for account in Account.select()}
 
         with ui.row():
-            self.account_select = ui.select(label="Account", options=accounts, on_change=self.account_selected).classes("min-w-[400px]").props('popup-content-class="!max-h-[200px]')
+            self.account_select = ui.select(label="Account", options=accounts, on_change=self.account_selected).classes("min-w-[400px]").props('popup-content-class="!max-h-[500px]"')
             with ui.column():
                 self.update_button = ui.button("Update Account Info", on_click=self.update_account_info)
                 self.last_updated = ui.label()
