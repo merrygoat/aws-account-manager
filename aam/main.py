@@ -3,54 +3,51 @@ import datetime
 
 import nicegui.events
 from nicegui import ui
-from dateutil import rrule, parser
 
 import aam.aws
-from aam import note_dialog
-from aam.models import Account, LastAccountUpdate, Person, Sysadmin, Note, Month
+from aam import note_dialog, initialization
+from aam.models import Account, LastAccountUpdate, Person, Sysadmin, Note, Month, Bill
+from aam.utilities import get_bill_months
 
 
 @ui.page('/')
 def main():
 
-    people = [person for person in Person.select()]
-    if not people:
-        Person.create(first_name="Peter", last_name="Crowther", email="peter@internet.com")
-        Person.create(first_name="Felix", last_name="Edelsten", email="felix@internet.com")
-        Person.create(first_name="Connor", last_name="Main", email="connor@internet.com")
+    initialization.initialize()
 
-    main_form = MainForm()
+    main_form = UIMainForm()
 
     ui.run()
 
 
-class MainForm:
+class UIMainForm:
     def __init__(self):
         with ui.row().classes('w-full no-wrap'):
-            self.account_grid = AccountSelect(self)
+            self.account_grid = UIAccountSelect(self)
         ui.separator()
 
         with ui.row().classes('w-full no-wrap'):
             with ui.column().classes('w-1/3'):
-                self.account_details = AccountDetails(self)
-                self.notes = AccountNotes(self)
+                self.account_details = UIAccountDetails(self)
+                self.notes = UIAccountNotes(self)
             with ui.column().classes('w-2/3'):
-                ui.html("Money").classes("text-2xl")
-                self.months = Months(self)
+                self.bills = UIBills(self)
+                self.exchange_rate = UIExchangeRate(self)
 
-class Months:
-    def __init__(self, parent: MainForm):
+class UIExchangeRate:
+    def __init__(self, parent: UIMainForm):
         self.parent = parent
 
         self.month_grid = ui.aggrid({
+            "defaultColDef": {"sortable": False},
             'columnDefs': [{"headerName": "id", "field": "id", "hide": True},
-                           {"headerName": "Month", "field": "month", "cellDataType": "dateString"},
+                           {"headerName": "Month", "field": "month", "cellDataType": "string"},
                            {"headerName": "Exchange rate £/$", "field": "exchange_rate", "editable": True}],
             'rowData': {},
             'rowSelection': 'multiple',
             'stopEditingWhenCellsLoseFocus': True,
         })
-        months = [{"id": month.id, "month": month.date, "exchange_rate": month.exchange_rate} for month in Month]
+        months = [{"id": month.id, "month": month.date.strftime("%b-%y"), "exchange_rate": month.exchange_rate} for month in Month.select()]
         self.month_grid.on("cellValueChanged", self.update_exchange_rate)
         self.month_grid.options["rowData"] = months
         self.month_grid.update()
@@ -63,9 +60,38 @@ class Months:
         month.save()
 
 
+class UIBills:
+    def __init__(self, parent):
+        self.parent = parent
+        ui.html("Money").classes("text-2xl")
+        self.bill_grid = ui.aggrid({
+            'columnDefs': [{"headerName": "id", "field": "id", "hide": True},
+                           {"headerName": "Month", "field": "month"},
+                           {"headerName": "Usage", "field": "Usage"}],
+            'rowData': {},
+            'rowSelection': 'multiple',
+            'stopEditingWhenCellsLoseFocus': True,
+        })
 
-class AccountDetails:
-    def __init__(self, parent: MainForm):
+
+    def update(self, account: Account):
+        bills = [{"id": bill.id, "month": bill.month.date, "usage": bill.usage} for bill in account.bills]
+        if account.creation_date:
+            required_bill_months = get_bill_months(account.creation_date)
+            actual_bill_months = [bill["month"] for bill in bills]
+            missing_months = set(required_bill_months) - set(actual_bill_months)
+
+            if missing_months:
+                for month in missing_months:
+                    Bill.create(account_id=account.id, month_id=Month.get(date=month))
+                bills = [{"id": bill.id, "month": bill.month.date, "usage": bill.usage} for bill in account.bills]
+
+            self.bill_grid.options["rowData"] = bills
+            self.bill_grid.update()
+
+
+class UIAccountDetails:
+    def __init__(self, parent: UIMainForm):
         self.parent = parent
 
         ui.html("Account Details").classes("text-2xl")
@@ -94,13 +120,13 @@ class AccountDetails:
                 "clearable outlined")
             ui.label("Sysadmin email:")
             self.sysadmin_email = ui.label("")
-            ui.label("Billing start")
-            with ui.input('Date') as self.billing_start:
+            ui.label("Creation date")
+            with ui.input('Date') as self.account_creation_input:
                 with ui.menu().props('no-parent-event') as menu:
-                    with ui.date(mask="DD-MM-YY").bind_value(self.billing_start):
+                    with ui.date().bind_value(self.account_creation_input) as self.account_creation_date:
                         with ui.row().classes('justify-end'):
                             ui.button('Close', on_click=menu.close).props('flat')
-                with self.billing_start.add_slot('append'):
+                with self.account_creation_input.add_slot('append'):
                     ui.icon('edit_calendar').on('click', menu.open).classes('cursor-pointer')
         with ui.column().classes("items-end w-full"):
             self.save_changes = ui.button("Save Changes", on_click=self.save_account_changes)
@@ -128,7 +154,7 @@ class AccountDetails:
         ui.notify("Record updated.")
         account.finance_code = self.finance_code.value
         account.task_code = self.task_code.value
-        account.billing_start = self.billing_start.value
+        account.creation_date = datetime.date.fromisoformat(self.account_creation_date.value)
         account.save()
 
     def update_sysadmin_email(self, event: nicegui.events.ValueChangeEventArguments):
@@ -195,15 +221,15 @@ class AccountDetails:
         else:
             self.sysadmin.set_value(None)
 
-        if account.billing_start:
-            self.billing_start.value = account.billing_start
+        if account.creation_date:
+            self.account_creation_date.value = account.creation_date
         else:
-            self.billing_start.value = ""
+            self.account_creation_input.value = ""
 
 
 
-class AccountNotes:
-    def __init__(self, parent: MainForm):
+class UIAccountNotes:
+    def __init__(self, parent: UIMainForm):
         self.parent = parent
         ui.html("Notes").classes("text-xl")
         self.notes_grid = ui.aggrid({
@@ -234,8 +260,8 @@ class AccountNotes:
         self.notes_grid.update()
 
 
-class AccountSelect:
-    def __init__(self, parent: MainForm):
+class UIAccountSelect:
+    def __init__(self, parent: UIMainForm):
         self.parent = parent
 
         accounts = {account.id: f"{account.name} ({account.id}) - {account.status}" for account in Account.select()}
@@ -254,6 +280,7 @@ class AccountSelect:
         account = Account.get_or_none(Account.id == selected_account_id)
 
         self.parent.account_details.update(account)
+        self.parent.bills.update(account)
         self.parent.notes.update_note_grid(account)
 
 

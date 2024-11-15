@@ -8,11 +8,11 @@ from nicegui import ui
 from aam.models import Note
 
 if TYPE_CHECKING:
-    from aam.main import AccountNotes
+    from aam.main import UIAccountNotes
 
 
 class AddNoteDialog:
-    def __init__(self, parent: "AccountNotes"):
+    def __init__(self, parent: "UIAccountNotes"):
         self.parent = parent
 
         with ui.dialog() as self.dialog:
@@ -50,7 +50,7 @@ class AddNoteDialog:
 
 
 class EditNoteDialog:
-    def __init__(self, parent: "AccountNotes"):
+    def __init__(self, parent: "UIAccountNotes"):
         self.parent = parent
         self.note_id = ""
 
