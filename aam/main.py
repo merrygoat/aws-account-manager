@@ -66,16 +66,27 @@ class UIBills:
         ui.html("Money").classes("text-2xl")
         self.bill_grid = ui.aggrid({
             'columnDefs': [{"headerName": "id", "field": "id", "hide": True},
-                           {"headerName": "Month", "field": "month"},
-                           {"headerName": "Usage", "field": "Usage"}],
+                           {"headerName": "Month", "field": "month", "sort": "desc"},
+                           {"headerName": "Usage ($)", "field": "usage_dollar", "editable": True},
+                           {"headerName": "Usage (£)", "field": "usage_pound",
+                            "valueFormatter": "value.toFixed(2)"}],
             'rowData': {},
             'rowSelection': 'multiple',
             'stopEditingWhenCellsLoseFocus': True,
         })
+        self.bill_grid.on("cellValueChanged", self.update_bill)
 
+    def initialize(self, account: Account):
+        """This function is run when an account is selected from the dropdown menu."""
+        bills = []
+        for bill in account.bills:
+            new_bill = {"id": bill.id, "month": bill.month.date, "usage_dollar": bill.usage}
+            if bill.usage:
+                new_bill["usage_pound"] = bill.month.exchange_rate * bill.usage
+            else:
+                new_bill["usage_pound"] = None
+            bills.append(new_bill)
 
-    def update(self, account: Account):
-        bills = [{"id": bill.id, "month": bill.month.date, "usage": bill.usage} for bill in account.bills]
         if account.creation_date:
             required_bill_months = get_bill_months(account.creation_date)
             actual_bill_months = [bill["month"] for bill in bills]
@@ -84,11 +95,20 @@ class UIBills:
             if missing_months:
                 for month in missing_months:
                     Bill.create(account_id=account.id, month_id=Month.get(date=month))
-                bills = [{"id": bill.id, "month": bill.month.date, "usage": bill.usage} for bill in account.bills]
+                bills = [{"id": bill.id, "month": bill.month.date, "usage_dollar": bill.usage} for bill in account.bills]
 
             self.bill_grid.options["rowData"] = bills
-            self.bill_grid.update()
+        else:
+            self.bill_grid.options["rowDate"] = {}
 
+        self.bill_grid.update()
+
+    @staticmethod
+    def update_bill(event: nicegui.events.GenericEventArguments):
+        bill_id = event.args["data"]["id"]
+        bill = Bill.get(id=bill_id)
+        bill.usage = event.args["data"]["usage_dollar"]
+        bill.save()
 
 class UIAccountDetails:
     def __init__(self, parent: UIMainForm):
@@ -280,7 +300,7 @@ class UIAccountSelect:
         account = Account.get_or_none(Account.id == selected_account_id)
 
         self.parent.account_details.update(account)
-        self.parent.bills.update(account)
+        self.parent.bills.initialize(account)
         self.parent.notes.update_note_grid(account)
 
 
