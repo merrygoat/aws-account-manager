@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+from typing import Optional
 
 import nicegui.events
 from nicegui import ui
@@ -63,6 +64,7 @@ class UIExchangeRate:
 class UIBills:
     def __init__(self, parent):
         self.parent = parent
+        self.selected_account: Optional[Account] = None
         ui.html("Money").classes("text-2xl")
         self.bill_grid = ui.aggrid({
             'columnDefs': [{"headerName": "id", "field": "id", "hide": True},
@@ -78,37 +80,33 @@ class UIBills:
 
     def initialize(self, account: Account):
         """This function is run when an account is selected from the dropdown menu."""
-        bills = []
-        for bill in account.bills:
-            new_bill = {"id": bill.id, "month": bill.month.date, "usage_dollar": bill.usage}
-            if bill.usage:
-                new_bill["usage_pound"] = bill.month.exchange_rate * bill.usage
-            else:
-                new_bill["usage_pound"] = None
-            bills.append(new_bill)
-
+        self.selected_account = account
         if account.creation_date:
-            required_bill_months = get_bill_months(account.creation_date)
+            bills = account.get_bills()
+            required_bill_months = get_bill_months(account.creation_date, account.final_date())
             actual_bill_months = [bill["month"] for bill in bills]
             missing_months = set(required_bill_months) - set(actual_bill_months)
 
             if missing_months:
                 for month in missing_months:
-                    Bill.create(account_id=account.id, month_id=Month.get(date=month))
-                bills = [{"id": bill.id, "month": bill.month.date, "usage_dollar": bill.usage} for bill in account.bills]
-
+                    Bill.get_or_create(account_id=account.id, month_id=Month.get(date=month))
+                bills = account.get_bills()
             self.bill_grid.options["rowData"] = bills
         else:
-            self.bill_grid.options["rowDate"] = {}
-
+            self.bill_grid.options["rowData"] = {}
         self.bill_grid.update()
 
-    @staticmethod
-    def update_bill(event: nicegui.events.GenericEventArguments):
+    def update_grid(self):
+        bills = self.selected_account.get_bills()
+        self.bill_grid.options["rowData"] = bills
+        self.bill_grid.update()
+        
+    def update_bill(self, event: nicegui.events.GenericEventArguments):
         bill_id = event.args["data"]["id"]
         bill = Bill.get(id=bill_id)
         bill.usage = event.args["data"]["usage_dollar"]
         bill.save()
+        self.update_grid()
 
 class UIAccountDetails:
     def __init__(self, parent: UIMainForm):
@@ -142,12 +140,20 @@ class UIAccountDetails:
             self.sysadmin_email = ui.label("")
             ui.label("Creation date").classes("place-content-center")
             with ui.input('Date').props("dense") as self.account_creation_input:
-                with ui.menu().props('no-parent-event') as menu:
+                with ui.menu().props('no-parent-event') as account_creation_menu:
                     with ui.date().bind_value(self.account_creation_input) as self.account_creation_date:
                         with ui.row().classes('justify-end'):
-                            ui.button('Close', on_click=menu.close).props('flat')
+                            ui.button('Close', on_click=account_creation_menu.close).props('flat')
                 with self.account_creation_input.add_slot('append'):
-                    ui.icon('edit_calendar').on('click', menu.open).classes('cursor-pointer')
+                    ui.icon('edit_calendar').on('click', account_creation_menu.open).classes('cursor-pointer')
+            ui.label("Closure date").classes("place-content-center")
+            with ui.input('Date').props("dense") as self.account_closure_input:
+                with ui.menu().props('no-parent-event') as account_closure_menu:
+                    with ui.date().bind_value(self.account_closure_input) as self.account_closure_date:
+                        with ui.row().classes('justify-end'):
+                            ui.button('Close', on_click=account_closure_menu.close).props('flat')
+                with self.account_closure_input.add_slot('append'):
+                    ui.icon('edit_calendar').on('click', account_closure_menu.open).classes('cursor-pointer')
         with ui.column().classes("items-end w-full"):
             self.save_changes = ui.button("Save Changes", on_click=self.save_account_changes)
 
@@ -158,7 +164,7 @@ class UIAccountDetails:
         self.save_changes.disable()
 
     def save_account_changes(self):
-        account = Account.get(Account.id == self.account_id.text)
+        account: Account = Account.get(Account.id == self.account_id.text)
         selected_sysadmin = self.sysadmin.value
         if selected_sysadmin:
             selected_sysadmin = Person.get(Person.id == selected_sysadmin)
@@ -175,6 +181,7 @@ class UIAccountDetails:
         account.finance_code = self.finance_code.value
         account.task_code = self.task_code.value
         account.creation_date = datetime.date.fromisoformat(self.account_creation_date.value)
+        account.closure_date = datetime.date.fromisoformat(self.account_closure_date.value)
         account.save()
 
     def update_sysadmin_email(self, event: nicegui.events.ValueChangeEventArguments):
@@ -242,11 +249,14 @@ class UIAccountDetails:
             self.sysadmin.set_value(None)
 
         if account.creation_date:
-            self.account_creation_date.value = account.creation_date
+            self.account_creation_date.value = account.creation_date.isoformat()
         else:
             self.account_creation_input.value = ""
 
-
+        if account.closure_date:
+            self.account_closure_date.value = account.closure_date.isoformat()
+        else:
+            self.account_closure_date.value = ""
 
 class UIAccountNotes:
     def __init__(self, parent: UIMainForm):

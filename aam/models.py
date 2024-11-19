@@ -1,3 +1,7 @@
+import datetime
+
+from dateutil.relativedelta import relativedelta
+
 import peewee
 import playhouse.shortcuts
 
@@ -35,6 +39,36 @@ class Account(BaseModel, DictMixin):
     finance_code = peewee.CharField(null=True)
     task_code = peewee.CharField(null=True)
     creation_date = peewee.DateField(null=True)
+    closure_date: datetime.date = peewee.DateField(null=True)
+
+    def get_bills(self) -> list[dict]:
+        """Returns a list of dicts describing bills in the account between the creation date and the account closure
+        date. If the account creation date is not set then return an empty list."""
+        bills = []
+
+        if self.closure_date:
+            end = self.closure_date
+        else:
+            end = datetime.date.today()
+
+        if self.creation_date:
+            for bill in self.bills:
+                # Need to add a month to the end date to make sure the last month is included.
+                if self.creation_date <= bill.month.date:
+                    if bill.month.date < end or bill.month.date_in_month(end):
+                        new_bill = {"id": bill.id, "month": bill.month.date, "usage_dollar": bill.usage}
+                        if bill.usage:
+                            new_bill["usage_pound"] = bill.month.exchange_rate * bill.usage
+                        else:
+                            new_bill["usage_pound"] = None
+                        bills.append(new_bill)
+        return bills
+
+    def final_date(self) -> datetime.date:
+        if self.closure_date:
+            return self.closure_date
+        else:
+            return datetime.date.today()
 
 class Sysadmin(BaseModel):
     id = peewee.AutoField()
@@ -60,12 +94,20 @@ class Month(BaseModel):
     date = peewee.DateField()
     exchange_rate = peewee.DecimalField()
 
+    def date_in_month(self, date: datetime.date) -> bool:
+         """Returns true if date is in month."""
+         if (self.date.month == date.month) and (self.date.year == date.year):
+             return True
+         return False
+
+
 class Bill(BaseModel):
     id = peewee.AutoField()
     account_id = peewee.ForeignKeyField(Account, backref="bills")
     month = peewee.ForeignKeyField(Month, backref="bills")
     usage = peewee.DecimalField(null=True)
     support_eligible = peewee.BooleanField(default=True)
+
 
 class Recharge(BaseModel):
     id = peewee.AutoField()
