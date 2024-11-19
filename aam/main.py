@@ -117,31 +117,31 @@ class UIAccountDetails:
         ui.html("Account Details").classes("text-2xl")
         with ui.grid(columns='auto 1fr').classes('w-full'):
             ui.label("Name:")
-            self.account_name = ui.label("")
+            self.account_name = ui.label("").classes("place-content-center")
             ui.label("Account ID:")
-            self.account_id = ui.label("")
+            self.account_id = ui.label("").classes("place-content-center")
             ui.label("Root Email:")
-            self.root_email = ui.label("")
+            self.root_email = ui.label("").classes("place-content-center")
             ui.label("Account Status:")
             self.account_status = ui.label("")
             ui.html("Billing/Contact Details").classes("text-2xl")
             ui.element()
-            ui.label("Budget Holder:")
+            ui.label("Budget Holder:").classes("place-content-center")
             self.budget_holder = ui.select([], on_change=self.update_budget_holder_email).props(
-                "clearable outlined")
-            ui.label("Budget Holder email:")
+                "clearable outlined dense")
+            ui.label("Budget Holder email:").classes("place-content-center")
             self.budget_holder_email = ui.label("")
-            ui.label("Finance Code:")
-            self.finance_code = ui.input().props("clearable outlined")
-            ui.label("Task Code:")
-            self.task_code = ui.input().props("clearable outlined ")
-            ui.label("Sysadmin:")
+            ui.label("Finance Code:").classes("place-content-center")
+            self.finance_code = ui.input().props("clearable outlined dense")
+            ui.label("Task Code:").classes("place-content-center")
+            self.task_code = ui.input().props("clearable outlined dense")
+            ui.label("Sysadmin:").classes("place-content-center")
             self.sysadmin = ui.select([], on_change=self.update_sysadmin_email).props(
-                "clearable outlined")
+                "clearable outlined dense")
             ui.label("Sysadmin email:")
             self.sysadmin_email = ui.label("")
-            ui.label("Creation date")
-            with ui.input('Date') as self.account_creation_input:
+            ui.label("Creation date").classes("place-content-center")
+            with ui.input('Date').props("dense") as self.account_creation_input:
                 with ui.menu().props('no-parent-event') as menu:
                     with ui.date().bind_value(self.account_creation_input) as self.account_creation_date:
                         with ui.row().classes('justify-end'):
@@ -288,9 +288,8 @@ class UIAccountSelect:
 
         with ui.row():
             self.account_select = ui.select(label="Account", options=accounts, on_change=self.account_selected).classes("min-w-[400px]").props('popup-content-class="!max-h-[500px]"')
-            with ui.column():
-                self.update_button = ui.button("Update Account Info", on_click=self.update_account_info)
-                self.last_updated = ui.label()
+            self.update_button = ui.button("Update Account Info", on_click=self.update_account_info)
+            self.last_updated = ui.label()
 
         self.update_last_updated_label()
 
