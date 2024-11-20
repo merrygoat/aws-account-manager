@@ -8,6 +8,7 @@ from nicegui import ui
 import aam.aws
 from aam import note_dialog, initialization
 from aam.models import Account, LastAccountUpdate, Person, Sysadmin, Note, Month, Bill
+from aam.settings_dialog import UISettingsDialog
 from aam.utilities import get_bill_months
 
 
@@ -23,9 +24,14 @@ def main():
 
 class UIMainForm:
     def __init__(self):
+        self.settings_dialog = UISettingsDialog(self)
+
         with ui.row().classes('w-full no-wrap'):
             self.account_grid = UIAccountSelect(self)
+            ui.space()
+            self.settings_button = ui.button("Settings", on_click=self.settings_dialog.open)
         ui.separator()
+
 
         with ui.row().classes('w-full no-wrap'):
             with ui.column().classes('w-1/3'):
@@ -33,32 +39,6 @@ class UIMainForm:
                 self.notes = UIAccountNotes(self)
             with ui.column().classes('w-2/3'):
                 self.bills = UIBills(self)
-                self.exchange_rate = UIExchangeRate(self)
-
-class UIExchangeRate:
-    def __init__(self, parent: UIMainForm):
-        self.parent = parent
-
-        self.month_grid = ui.aggrid({
-            "defaultColDef": {"sortable": False},
-            'columnDefs': [{"headerName": "id", "field": "id", "hide": True},
-                           {"headerName": "Month", "field": "month", "cellDataType": "string"},
-                           {"headerName": "Exchange rate £/$", "field": "exchange_rate", "editable": True}],
-            'rowData': {},
-            'rowSelection': 'multiple',
-            'stopEditingWhenCellsLoseFocus': True,
-        })
-        months = [{"id": month.id, "month": month.date.strftime("%b-%y"), "exchange_rate": month.exchange_rate} for month in Month.select()]
-        self.month_grid.on("cellValueChanged", self.update_exchange_rate)
-        self.month_grid.options["rowData"] = months
-        self.month_grid.update()
-
-    @staticmethod
-    def update_exchange_rate(event: nicegui.events.GenericEventArguments):
-        month_id = event.args["data"]["id"]
-        month = Month.get(id=month_id)
-        month.exchange_rate = event.args["data"]["exchange_rate"]
-        month.save()
 
 
 class UIBills:
@@ -303,6 +283,7 @@ class UIAccountSelect:
             self.account_select = ui.select(label="Account", options=accounts, on_change=self.account_selected).classes("min-w-[400px]").props('popup-content-class="!max-h-[500px]"')
             self.update_button = ui.button("Update Account Info", on_click=self.update_account_info)
             self.last_updated = ui.label()
+
 
         self.update_last_updated_label()
 
