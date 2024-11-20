@@ -13,7 +13,6 @@ if TYPE_CHECKING:
 class UIBills:
     def __init__(self, parent: "UIMainForm"):
         self.parent = parent
-        self.selected_account: Optional[Account] = None
         ui.html("Money").classes("text-2xl")
         self.bill_grid = ui.aggrid({
             'columnDefs': [{"headerName": "id", "field": "id", "hide": True},
@@ -32,7 +31,6 @@ class UIBills:
 
     def initialize(self, account: Account):
         """This function is run when an account is selected from the dropdown menu."""
-        self.selected_account = account
         if account.creation_date:
             bills = account.get_bills()
             required_bill_months = get_bill_months(account.creation_date, account.final_date())
@@ -49,7 +47,7 @@ class UIBills:
         self.bill_grid.update()
 
     def update_grid(self):
-        bills = self.selected_account.get_bills()
+        bills = self.parent.get_selected_account().get_bills()
         self.bill_grid.options["rowData"] = bills
         self.bill_grid.update()
 

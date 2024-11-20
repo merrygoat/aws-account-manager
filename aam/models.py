@@ -118,6 +118,7 @@ class Month(BaseModel):
     def __le__(self, other: "Month"):
         return self.date <= other.date
 
+
 class Bill(BaseModel):
     id = peewee.AutoField()
     account_id = peewee.ForeignKeyField(Account, backref="bills")
@@ -126,10 +127,21 @@ class Bill(BaseModel):
     support_eligible = peewee.BooleanField(default=True)
 
 
+class RechargeRequest(BaseModel):
+    id = peewee.AutoField()
+    date: datetime.date = peewee.DateField()
+    request_number = peewee.CharField()
+
+    def quarter(self) -> str:
+        quarter = (self.date.month // 3) + 1
+        return f"Q{quarter} {self.date.year}"
+
+
 class Recharge(BaseModel):
     id = peewee.AutoField()
     account_id = peewee.ForeignKeyField(Account, backref="recharges")
     month = peewee.ForeignKeyField(Month, backref="recharges")
+    recharge_request = peewee.ForeignKeyField(RechargeRequest, backref="recharges")
 
 
-db.create_tables([Account, LastAccountUpdate, Person, Sysadmin, Note, Month, Bill, Recharge])
+db.create_tables([Account, LastAccountUpdate, Person, Sysadmin, Note, Month, Bill, Recharge, RechargeRequest])

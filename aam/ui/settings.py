@@ -12,24 +12,11 @@ if TYPE_CHECKING:
 class UISettingsDialog:
     def __init__(self, parent: "UIMainForm"):
         self.parent = parent
-        with ui.dialog() as self.dialog:
-            with ui.card().style("width: 800px"):
-                with ui.column(align_items="center").classes("w-full"):
-                    ui.html("Settings").classes("text-2xl")
-                with ui.column().classes("w-full"):
-                    ui.html("Exchange Rate").classes("text-xl")
-                    self.exchange_rate_grid = UIExchangeRate(self)
-                with ui.column(align_items="end").classes("w-full"):
-                    self.close_button = ui.button("Close", on_click=self.close)
 
-
-    def open(self):
-        """Open the settings dialog."""
-        self.dialog.open()
-
-    def close(self):
-        """Close the settings dialog."""
-        self.dialog.close()
+        ui.label("Settings").classes("text-4xl")
+        with ui.column().classes("w-full"):
+            ui.label("Exchange Rate").classes("text-xl")
+            self.exchange_rate_grid = UIExchangeRate(self)
 
 
 class UIExchangeRate:

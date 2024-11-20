@@ -26,15 +26,14 @@ class UIAccountSelect:
 
         self.update_last_updated_label()
 
-
     def account_selected(self, event: nicegui.events.ValueChangeEventArguments):
         selected_account_id = event.sender.value
         account = Account.get_or_none(Account.id == selected_account_id)
 
         self.parent.account_details.update(account)
+        self.parent.set_selected_account(account)
         self.parent.bills.initialize(account)
         self.parent.notes.update_note_grid(account)
-
 
     async def update_account_info(self):
         with ui.dialog() as loadingDialog:
