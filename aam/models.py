@@ -41,7 +41,7 @@ class Account(BaseModel, DictMixin):
     budget_holder = peewee.ForeignKeyField(Person, backref="budget_holder", null=True)
     finance_code = peewee.CharField(null=True)
     task_code = peewee.CharField(null=True)
-    creation_date:datetime.date = peewee.DateField(null=True)
+    creation_date: datetime.date = peewee.DateField(null=True)
     closure_date: datetime.date = peewee.DateField(null=True)
 
     def get_bills(self) -> list[dict]:
@@ -130,11 +130,7 @@ class Bill(BaseModel):
 class RechargeRequest(BaseModel):
     id = peewee.AutoField()
     date: datetime.date = peewee.DateField()
-    request_number = peewee.CharField()
-
-    def quarter(self) -> str:
-        quarter = (self.date.month // 3) + 1
-        return f"Q{quarter} {self.date.year}"
+    reference = peewee.CharField()
 
 
 class Recharge(BaseModel):
