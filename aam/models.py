@@ -1,9 +1,12 @@
 import datetime
+import decimal
 
 from dateutil.relativedelta import relativedelta
 
 import peewee
 import playhouse.shortcuts
+
+import aam.utilities
 
 # Pragmas ensures foreign key constraints are enabled - they are disabled by default in SQLite.
 db = peewee.SqliteDatabase('data.db', pragmas={'foreign_keys': 1})
@@ -38,7 +41,7 @@ class Account(BaseModel, DictMixin):
     budget_holder = peewee.ForeignKeyField(Person, backref="budget_holder", null=True)
     finance_code = peewee.CharField(null=True)
     task_code = peewee.CharField(null=True)
-    creation_date = peewee.DateField(null=True)
+    creation_date:datetime.date = peewee.DateField(null=True)
     closure_date: datetime.date = peewee.DateField(null=True)
 
     def get_bills(self) -> list[dict]:
@@ -51,17 +54,20 @@ class Account(BaseModel, DictMixin):
         else:
             end = datetime.date.today()
 
+        support_start_month = Month.get(Month.date==datetime.date(2024, 7,1))
+
         if self.creation_date:
+            required_months = aam.utilities.get_bill_months(self.creation_date, end)
             for bill in self.bills:
-                # Need to add a month to the end date to make sure the last month is included.
-                if self.creation_date <= bill.month.date:
-                    if bill.month.date < end or bill.month.date_in_month(end):
-                        new_bill = {"id": bill.id, "month": bill.month.date, "usage_dollar": bill.usage}
-                        if bill.usage:
-                            new_bill["usage_pound"] = bill.month.exchange_rate * bill.usage
-                        else:
-                            new_bill["usage_pound"] = None
-                        bills.append(new_bill)
+                if bill.month.date in required_months:
+                    new_bill = {"id": bill.id, "month": bill.month.date, "usage_dollar": bill.usage}
+                    if bill.usage and bill.month >= support_start_month:
+                            new_bill["support_charge"] = bill.usage * decimal.Decimal(0.1)
+                            new_bill["total_pound"] = bill.month.exchange_rate * (bill.usage * decimal.Decimal(1.1))
+                    elif bill.usage:
+                            new_bill["support_charge"] = 0
+                            new_bill["total_pound"] = bill.month.exchange_rate * bill.usage
+                    bills.append(new_bill)
         return bills
 
     def final_date(self) -> datetime.date:
@@ -100,6 +106,17 @@ class Month(BaseModel):
              return True
          return False
 
+    def __gt__(self, other: "Month"):
+        return self.date > other.date
+
+    def __ge__(self, other: "Month"):
+        return self.date >= other.date
+
+    def __lt__(self, other: "Month"):
+        return self.date < other.date
+
+    def __le__(self, other: "Month"):
+        return self.date <= other.date
 
 class Bill(BaseModel):
     id = peewee.AutoField()

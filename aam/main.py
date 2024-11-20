@@ -69,8 +69,11 @@ class UIBills:
         self.bill_grid = ui.aggrid({
             'columnDefs': [{"headerName": "id", "field": "id", "hide": True},
                            {"headerName": "Month", "field": "month", "sort": "desc"},
-                           {"headerName": "Usage ($)", "field": "usage_dollar", "editable": True},
-                           {"headerName": "Usage (£)", "field": "usage_pound",
+                           {"headerName": "Usage ($)", "field": "usage_dollar", "editable": True,
+                            "valueFormatter": "value.toFixed(2)"},
+                           {"headerName": "Support Charge ($)", "field": "support_charge",
+                            "valueFormatter": "value.toFixed(2)"},
+                           {"headerName": "Total (£)", "field": "total_pound",
                             "valueFormatter": "value.toFixed(2)"}],
             'rowData': {},
             'rowSelection': 'multiple',
