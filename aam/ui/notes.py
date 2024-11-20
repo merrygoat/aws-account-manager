@@ -5,10 +5,42 @@ from typing import TYPE_CHECKING
 import nicegui.events
 from nicegui import ui
 
-from aam.models import Note
+from aam.models import Note, Account
 
 if TYPE_CHECKING:
-    from aam.main import UIAccountNotes
+    from aam.main import UIMainForm
+
+
+class UIAccountNotes:
+    def __init__(self, parent: "UIMainForm"):
+        self.parent = parent
+        ui.html("Notes").classes("text-xl")
+        self.notes_grid = ui.aggrid({
+            'columnDefs': [{"headerName": "id", "field": "id", "hide": True},
+                           {"headerName": "Date", "field": "date"},
+                           {"headerName": "Note", "field": "text"}],
+            'rowData': {},
+            'rowSelection': 'multiple',
+            'stopEditingWhenCellsLoseFocus': True,
+        })
+        self.add_note_dialog = AddNoteDialog(self)
+        self.edit_note_dialog = EditNoteDialog(self)
+        with ui.row():
+            ui.button('Add note', on_click=self.add_note_dialog.open)
+            ui.button('Edit note', on_click=self.edit_note_dialog.open)
+
+    def update_note_grid(self, account: Account):
+        notes = [note for note in Note.select().where(Note.account_id == account.id)]
+        if notes:
+            notes = [{"id": note.id, "date": note.date, "text": note.text} for note in notes]
+        else:
+            notes = []
+        self.notes_grid.options["rowData"] = notes
+        self.notes_grid.update()
+
+    def clear(self):
+        self.notes_grid.options["rowData"] = {}
+        self.notes_grid.update()
 
 
 class AddNoteDialog:
@@ -96,4 +128,3 @@ class EditNoteDialog:
         existing_note.save()
         self.close()
         ui.notify("Changes to Note saved.")
-
