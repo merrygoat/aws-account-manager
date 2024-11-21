@@ -11,6 +11,11 @@ from aam.ui.account_select import UIAccountSelect
 from aam.ui.notes import UIAccountNotes
 from aam.ui.recharges import UIRecharges
 
+import logging
+logger = logging.getLogger('peewee')
+logger.addHandler(logging.StreamHandler())
+logger.setLevel(logging.DEBUG)
+
 
 @ui.page('/')
 def main():
@@ -29,7 +34,6 @@ class UIMainForm:
             with splitter.before:
                 with ui.tabs().props('vertical').classes('w-full') as tabs:
                     self.accounts_tab = ui.tab('Accounts', icon='account_circle')
-                    self.recharges_tab = ui.tab('Recharges', icon='paid')
                     self.settings_tab = ui.tab('Settings', icon='settings')
             with splitter.after:
                 with ui.tab_panels(tabs, value=self.accounts_tab).props('vertical').classes('w-full h-full'):
@@ -42,8 +46,8 @@ class UIMainForm:
                                 self.notes = UIAccountNotes(self)
                             with ui.column().classes('w-2/3'):
                                 self.bills = UIBills(self)
-                    with ui.tab_panel(self.recharges_tab):
-                        self.recharges = UIRecharges(self)
+                                ui.separator()
+                                self.recharges = UIRecharges(self)
                     with ui.tab_panel(self.settings_tab):
                         self.settings = UISettingsDialog(self)
 

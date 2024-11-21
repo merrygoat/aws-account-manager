@@ -10,7 +10,7 @@ def get_bill_months(start_date: datetime.date, end_date: datetime.date) -> list[
     return bill_months
 
 def date_picker() -> ui.input:
-    with ui.input('Date').props("dense") as date_input:
+    with ui.input().props("dense") as date_input:
         with ui.menu().props('no-parent-event') as account_creation_menu:
             with ui.date().bind_value(date_input):
                 with ui.row().classes('justify-end'):

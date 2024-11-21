@@ -135,7 +135,7 @@ class RechargeRequest(BaseModel):
 
 class Recharge(BaseModel):
     id = peewee.AutoField()
-    account_id = peewee.ForeignKeyField(Account, backref="recharges")
+    account = peewee.ForeignKeyField(Account, backref="recharges")
     month = peewee.ForeignKeyField(Month, backref="recharges")
     recharge_request = peewee.ForeignKeyField(RechargeRequest, backref="recharges")
 
