@@ -62,8 +62,8 @@ class UIBills:
         self.update_bill_grid()
 
     async def add_recharges(self, event: nicegui.events.ClickEventArguments):
-        selected_recharge_request: RechargeRequest = self.parent.recharges.get_selected_recharge_request()
-        if not selected_recharge_request:
+        selected_recharge_request_id: RechargeRequest = self.parent.recharges.get_selected_recharge_request_id()
+        if not selected_recharge_request_id:
             ui.notify("No recharge request selected")
             return 0
 
@@ -75,6 +75,6 @@ class UIBills:
         bill_ids = [row["id"] for row in selected_rows]
         bills = Bill.select().where(Bill.id.in_(bill_ids))
         for bill in bills:
-            Recharge.create(account_id=bill.account_id, month=bill.month.id, recharge_request=selected_recharge_request.id)
+            Recharge.create(account_id=bill.account_id, month=bill.month.id, recharge_request=selected_recharge_request_id)
         self.update_bill_grid()
         self.parent.recharges.update_recharge_grid()

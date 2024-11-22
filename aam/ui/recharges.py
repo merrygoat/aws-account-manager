@@ -5,7 +5,7 @@ from nicegui import ui
 import nicegui.events
 
 from aam import utilities
-from aam.models import RechargeRequest
+from aam.models import RechargeRequest, Month, Recharge, Bill
 
 if TYPE_CHECKING:
     from aam.main import UIMainForm
@@ -28,14 +28,24 @@ class UIRecharges:
         self.recharge_grid = ui.aggrid({
             'columnDefs': [{"headerName": "id", "field": "id", "hide": True},
                            {"headerName": "Account", "field": "account_id"},
-                           {"headerName": "Month", "field": "month_id"},
+                           {"headerName": "Month", "field": "month_date"},
                            {"headerName": "Amount", "field": "recharge_amount"}],
             'rowData': {},
             'rowSelection': 'multiple',
             'stopEditingWhenCellsLoseFocus': True,
         })
 
+        self.remove_recharge_button = ui.button("Remove selected items from request", on_click=self.remove_recharge_from_request)
+
         self.get_request_options()
+
+    async def remove_recharge_from_request(self):
+        selected_rows = await(self.recharge_grid.get_selected_rows())
+        selected_recharges = [row["id"] for row in selected_rows]
+        delete_query = Recharge.delete().where(Recharge.id.in_(selected_recharges))
+        delete_query.execute()
+        self.update_recharge_grid()
+        self.parent.bills.update_bill_grid()
 
     def request_selected(self, event: nicegui.events.ValueChangeEventArguments):
         request_id = event.sender.value
@@ -47,17 +57,16 @@ class UIRecharges:
         requests = {request.id: f"{request.date} - {request.reference}" for request in RechargeRequest.select()}
         self.request_select.set_options(requests)
 
-    def get_selected_recharge_request(self) -> Optional[RechargeRequest]:
-        request_id = self.request_select.value
-        if request_id:
-            return RechargeRequest.get(RechargeRequest.id == request_id)
-        else:
-            return None
+    def get_selected_recharge_request_id(self) -> Optional[int]:
+        return self.request_select.value
 
     def update_recharge_grid(self):
-        request = self.get_selected_recharge_request()
-        recharges = [{"id": recharge.id, "account_id": recharge.account.id, "month_id": recharge.month.date.isoformat(), "recharge_amount": ""} for recharge in request.recharges]
-        self.recharge_grid.options["rowData"] = recharges
+        request_id = self.get_selected_recharge_request_id()
+        recharges = Recharge.select(Recharge.id, Recharge.account, Month.date, Bill.usage).join(Month).join(Bill).where(Recharge.recharge_request == request_id)
+        recharges_list = []
+        for recharge in recharges:
+            recharges_list.append({"id": recharge.id, "account_id": recharge.account_id, "month_date": recharge.month.date.isoformat(), "recharge_amount": recharge.month.bill.usage})
+        self.recharge_grid.options["rowData"] = recharges_list
         self.recharge_grid.update()
 
 class UINewRechargeDialog:

@@ -82,8 +82,15 @@ class UIAccountDetails:
         ui.notify("Record updated.")
         account.finance_code = self.finance_code.value
         account.task_code = self.task_code.value
-        account.creation_date = datetime.date.fromisoformat(self.account_creation_date.value)
-        account.closure_date = datetime.date.fromisoformat(self.account_closure_date.value)
+        account_creation_date = self.account_creation_date.value
+        if account_creation_date:
+            account_creation_date = datetime.date.fromisoformat(account_creation_date)
+        account.creation_date = account_creation_date
+
+        account_closure_date = self.account_closure_date.value
+        if account_closure_date:
+            account_closure_date = datetime.date.fromisoformat(account_closure_date)
+        account.closure_date = account_closure_date
         account.save()
 
     def update_sysadmin_email(self, event: nicegui.events.ValueChangeEventArguments):
