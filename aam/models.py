@@ -1,5 +1,6 @@
 import datetime
 import decimal
+from decimal import Decimal
 
 import peewee
 from peewee import JOIN
@@ -55,12 +56,13 @@ class Account(BaseModel, DictMixin):
 
         support_start_month = Month.get(Month.date==datetime.date(2024, 7,1))
 
-
         if self.creation_date:
             required_months = aam.utilities.get_bill_months(self.creation_date, end)
-            required_bills = Bill.select(Bill.id, Month.date, Bill.usage, Month.exchange_rate, RechargeRequest.reference).join(Month).join(Recharge, JOIN.LEFT_OUTER).join(RechargeRequest, JOIN.LEFT_OUTER).where(Month.date in required_months and Bill.account_id == self.id)
+            required_bills = Bill.select(Bill.id, Month.date, Bill.usage, Month.exchange_rate, Recharge.id, RechargeRequest.reference).join(Month).join(Recharge, JOIN.LEFT_OUTER).join(RechargeRequest, JOIN.LEFT_OUTER).where(Month.date in required_months and Bill.account_id == self.id)
             for bill in required_bills:
-                new_bill = {"id": bill.id, "month": bill.month.date, "usage_dollar": bill.usage} #, "recharge_reference": bill.month.recharge.recharge_request.reference}
+                new_bill = {"id": bill.id, "date": bill.month.date, "usage_dollar": bill.usage}
+                if hasattr(bill.month, "recharge"):
+                    new_bill["recharge_reference"] = bill.month.recharge.recharge_request.reference
                 if bill.usage and bill.month >= support_start_month:
                         new_bill["support_charge"] = bill.usage * decimal.Decimal(0.1)
                         new_bill["total_pound"] = bill.month.exchange_rate * (bill.usage * decimal.Decimal(1.1))

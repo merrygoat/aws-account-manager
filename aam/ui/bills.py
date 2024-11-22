@@ -17,14 +17,14 @@ class UIBills:
         self.bill_grid = ui.aggrid({
             'defaultColDef': {"suppressMovable": True},
             'columnDefs': [{"headerName": "id", "field": "id", "hide": True},
-                           {"headerName": "Month", "field": "month", "sort": "desc"},
+                           {"headerName": "Month", "field": "date", "sort": "desc"},
                            {"headerName": "Usage ($)", "field": "usage_dollar", "editable": True,
                             "valueFormatter": "value.toFixed(2)"},
                            {"headerName": "Support Charge ($)", "field": "support_charge",
                             "valueFormatter": "value.toFixed(2)"},
                            {"headerName": "Total (£)", "field": "total_pound",
                             "valueFormatter": "value.toFixed(2)"},
-                           {"headerName": "Recharge Reference", "field": "recharge"}],
+                           {"headerName": "Recharge Reference", "field": "recharge_reference"}],
             'rowData': {},
             'rowSelection': 'multiple',
             'stopEditingWhenCellsLoseFocus': True,
@@ -37,7 +37,7 @@ class UIBills:
         if account.creation_date:
             bills = account.get_bills()
             required_bill_months = get_bill_months(account.creation_date, account.final_date())
-            actual_bill_months = [bill["month"] for bill in bills]
+            actual_bill_months = [bill["date"] for bill in bills]
             missing_months = set(required_bill_months) - set(actual_bill_months)
 
             if missing_months:
