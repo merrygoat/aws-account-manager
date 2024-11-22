@@ -16,15 +16,17 @@ class UIAccountSelect:
     def __init__(self, parent: "UIMainForm"):
         self.parent = parent
 
-        accounts = {account.id: f"{account.name} ({account.id}) - {account.status}" for account in Account.select()}
-
         with ui.row():
-            self.account_select = ui.select(label="Account", options=accounts, on_change=self.account_selected).classes("min-w-[400px]").props('popup-content-class="!max-h-[500px]"')
+            self.account_select = ui.select(label="Account", options={}, on_change=self.account_selected).classes("min-w-[400px]").props('popup-content-class="!max-h-[500px]"')
             self.update_button = ui.button("Update Account Info", on_click=self.update_account_info)
             self.last_updated = ui.label()
 
-
         self.update_last_updated_label()
+        self.update_account_select_options()
+
+    def update_account_select_options(self):
+        accounts = {account.id: f"{account.name} ({account.id}) - {account.status}" for account in Account.select()}
+        self.account_select.set_options(accounts)
 
     def account_selected(self, event: nicegui.events.ValueChangeEventArguments):
         selected_account_id = event.sender.value
@@ -39,11 +41,9 @@ class UIAccountSelect:
         with ui.dialog() as loadingDialog:
             ui.spinner(size='10em', color='black')
         loadingDialog.open()
-
         await asyncio.to_thread(get_and_process_account_info)
-
         self.update_last_updated_label()
-
+        self.update_account_select_options()
         loadingDialog.close()
 
     def update_last_updated_label(self):
