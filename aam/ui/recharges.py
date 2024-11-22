@@ -62,7 +62,10 @@ class UIRecharges:
 
     def update_recharge_grid(self):
         request_id = self.get_selected_recharge_request_id()
-        recharges = Recharge.select(Recharge.id, Recharge.account, Month.date, Bill.usage).join(Month).join(Bill).where(Recharge.recharge_request == request_id)
+        recharges = (Recharge.select(Recharge.id, Recharge.account, Month.date, Bill.usage)
+                     .join(Month)
+                     .join(Bill, on=((Month.id == Bill.month) & (Recharge.account == Bill.account_id)))
+                     .where(Recharge.recharge_request == request_id))
         recharges_list = []
         for recharge in recharges:
             recharges_list.append({"id": recharge.id, "account_id": recharge.account_id, "month_date": recharge.month.date.isoformat(), "recharge_amount": recharge.month.bill.usage})

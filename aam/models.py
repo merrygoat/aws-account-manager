@@ -1,6 +1,5 @@
 import datetime
 import decimal
-from decimal import Decimal
 
 import peewee
 from peewee import JOIN
@@ -58,7 +57,12 @@ class Account(BaseModel, DictMixin):
 
         if self.creation_date:
             required_months = aam.utilities.get_bill_months(self.creation_date, end)
-            required_bills = Bill.select(Bill.id, Month.date, Bill.usage, Month.exchange_rate, Recharge.id, RechargeRequest.reference).join(Month).join(Recharge, JOIN.LEFT_OUTER).join(RechargeRequest, JOIN.LEFT_OUTER).where(Month.date in required_months and Bill.account_id == self.id)
+            required_bills = (Bill.select(Bill.id, Month.date, Bill.usage, Month.exchange_rate, Recharge.id, RechargeRequest.reference)
+                              .join(Month)
+                              .join(Recharge, JOIN.LEFT_OUTER, on=((Recharge.month == Month.id) & (Recharge.account == Bill.account_id)))
+                              .join(RechargeRequest, JOIN.LEFT_OUTER)
+                              .where((Month.date.in_(required_months)) & (Bill.account_id == self.id)))
+
             for bill in required_bills:
                 new_bill = {"id": bill.id, "date": bill.month.date, "usage_dollar": bill.usage}
                 if hasattr(bill.month, "recharge"):

@@ -92,6 +92,7 @@ class UIAccountDetails:
             account_closure_date = datetime.date.fromisoformat(account_closure_date)
         account.closure_date = account_closure_date
         account.save()
+        self.parent.bills.update_bill_grid()
 
     def update_sysadmin_email(self, event: nicegui.events.ValueChangeEventArguments):
         selected_person = event.sender.value
