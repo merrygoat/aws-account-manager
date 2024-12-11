@@ -3,7 +3,6 @@ from decimal import Decimal
 
 import peewee
 from peewee import JOIN
-import playhouse.shortcuts
 
 import aam.utilities
 
@@ -11,17 +10,12 @@ import aam.utilities
 db = peewee.SqliteDatabase('data.db', pragmas={'foreign_keys': 1})
 
 
-class DictMixin:
-    def to_dict(self):
-        return playhouse.shortcuts.model_to_dict(self)
-
-
 class BaseModel(peewee.Model):
     class Meta:
         database = db
 
 
-class Person(BaseModel, DictMixin):
+class Person(BaseModel):
     id = peewee.AutoField()
     first_name = peewee.CharField()
     last_name = peewee.CharField()
@@ -32,7 +26,7 @@ class Person(BaseModel, DictMixin):
         return f"{self.first_name} {self.last_name}"
 
 
-class Account(BaseModel, DictMixin):
+class Account(BaseModel):
     id = peewee.CharField(primary_key=True)
     name = peewee.CharField()
     email = peewee.CharField()

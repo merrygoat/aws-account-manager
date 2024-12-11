@@ -1,11 +1,12 @@
 import datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING, Optional
 
 from nicegui import ui
 import nicegui.events
 
 from aam import utilities
-from aam.models import RechargeRequest, Month, Recharge, Bill
+from aam.models import RechargeRequest, Month, Recharge, Bill, Account, Person
 
 if TYPE_CHECKING:
     from aam.main import UIMainForm
@@ -27,8 +28,8 @@ class UIRecharges:
         self.recharge_grid_title = ui.label("Recharges in recharge request: ")
         self.recharge_grid = ui.aggrid({
             'columnDefs': [{"headerName": "id", "field": "id", "hide": True},
-                           {"headerName": "Account", "field": "account_id"},
-                           {"headerName": "Month", "field": "month_date"},
+                           {"headerName": "Account", "field": "account_name", "sort": "asc", "sortIndex": 0},
+                           {"headerName": "Month", "field": "month_date", "sort": "asc", "sortIndex": 1},
                            {"headerName": "Amount", "field": "recharge_amount"}],
             'rowData': {},
             'rowSelection': 'multiple',
@@ -36,8 +37,37 @@ class UIRecharges:
         })
 
         self.remove_recharge_button = ui.button("Remove selected items from request", on_click=self.remove_recharge_from_request)
-
+        self.export_recharge_button = ui.button("Export selected request", on_click=self.export_recharge_request)
         self.get_request_options()
+
+    def export_recharge_request(self):
+        request_id = self.get_selected_recharge_request_id()
+        if not request_id:
+            ui.notify("No recharge request selected.")
+            return 0
+        recharge_request = RechargeRequest.get(RechargeRequest.id == request_id)
+        recharges = (Recharge.select(Recharge.id, Recharge.account, Month.date, Month.exchange_rate, Bill.month, Bill.usage, Account.name, Account.finance_code, Account.task_code)
+                     .join(Month)
+                     .join(Bill, on=((Month.id == Bill.month) & (Recharge.account == Bill.account_id)))
+                     .join(Account)
+                     .join(Person)
+                     .where(Recharge.recharge_request == request_id))
+
+        recharge_dict = {}
+        for recharge in recharges:
+            if recharge.account.id not in recharge_dict:
+                recharge_dict[recharge.account.id] = []
+            recharge_dict[recharge.account.id].append(recharge)
+
+        export_string = "Account Number, Account Name, Budget Holder Name, Budget Holder Email, CC email, Finance Code, Task Code, Total\n"
+        for account_number, recharges in recharge_dict.items():
+            total = Decimal(0)
+            for recharge in recharges:
+                total += recharge.month.bill.total_pound()
+            total = round(total, 2)
+            account = recharges[0].account
+            export_string += f"{account_number}, {account.name}, {account.budget_holder.first_name}, {account.budget_holder.email}, , {account.finance_code}, {account.task_code}, {total}\n"
+        ui.download(bytes(export_string, 'utf-8'), f"{recharge_request.reference} export.txt")
 
     async def remove_recharge_from_request(self):
         selected_rows = await(self.recharge_grid.get_selected_rows())
@@ -62,13 +92,15 @@ class UIRecharges:
 
     def update_recharge_grid(self):
         request_id = self.get_selected_recharge_request_id()
-        recharges = (Recharge.select(Recharge.id, Recharge.account, Month.date, Bill.usage)
+        recharges = (Recharge.select(Recharge.id, Recharge.account, Month.date, Bill.usage, Account.name)
                      .join(Month)
                      .join(Bill, on=((Month.id == Bill.month) & (Recharge.account == Bill.account_id)))
+                     .join(Account)
                      .where(Recharge.recharge_request == request_id))
         recharges_list = []
         for recharge in recharges:
-            recharges_list.append({"id": recharge.id, "account_id": recharge.account_id, "month_date": recharge.month.date.isoformat(), "recharge_amount": recharge.month.bill.usage})
+            recharges_list.append({"id": recharge.id, "account_name": f"{recharge.month.bill.account_id.name} - {recharge.account_id}",
+                                   "month_date": recharge.month.date.isoformat(), "recharge_amount": recharge.month.bill.usage})
         self.recharge_grid.options["rowData"] = recharges_list
         self.recharge_grid.update()
 

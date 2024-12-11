@@ -75,6 +75,9 @@ class UIBills:
         bill_ids = [row["id"] for row in selected_rows]
         bills = Bill.select().where(Bill.id.in_(bill_ids))
         for bill in bills:
-            Recharge.get_or_create(account_id=bill.account_id, month=bill.month.id, recharge_request=selected_recharge_request_id)
+            if bill.usage is None:
+                ui.notify(f"Cannot add bill for month {bill.month.date} as it has no recorded usage.")
+            else:
+                Recharge.get_or_create(account_id=bill.account_id, month=bill.month.id, recharge_request=selected_recharge_request_id)
         self.update_bill_grid()
         self.parent.recharges.update_recharge_grid()
