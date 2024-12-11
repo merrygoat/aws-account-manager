@@ -1,5 +1,5 @@
 import datetime
-import decimal
+from decimal import Decimal
 
 import peewee
 from peewee import JOIN
@@ -53,8 +53,6 @@ class Account(BaseModel, DictMixin):
         else:
             end = datetime.date.today()
 
-        support_start_month = Month.get(Month.date==datetime.date(2024, 7,1))
-
         if self.creation_date:
             required_months = aam.utilities.get_bill_months(self.creation_date, end)
             required_bills = (Bill.select(Bill.id, Month.date, Bill.usage, Month.exchange_rate, Recharge.id, RechargeRequest.reference)
@@ -64,15 +62,12 @@ class Account(BaseModel, DictMixin):
                               .where((Month.date.in_(required_months)) & (Bill.account_id == self.id)))
 
             for bill in required_bills:
-                new_bill = {"id": bill.id, "date": bill.month.date, "usage_dollar": bill.usage}
+                new_bill = {"id": bill.id, "date": bill.month.date, "usage_dollar": bill.usage,
+                            "support_charge": bill.support_charge(), "total_pound": bill.total_pound()}
                 if hasattr(bill.month, "recharge"):
                     new_bill["recharge_reference"] = bill.month.recharge.recharge_request.reference
-                if bill.usage and bill.month >= support_start_month:
-                        new_bill["support_charge"] = bill.usage * decimal.Decimal(0.1)
-                        new_bill["total_pound"] = bill.month.exchange_rate * (bill.usage * decimal.Decimal(1.1))
-                elif bill.usage:
-                        new_bill["support_charge"] = 0
-                        new_bill["total_pound"] = bill.month.exchange_rate * bill.usage
+                else:
+                    new_bill["recharge_reference"] = "-"
                 bills.append(new_bill)
         return bills
 
@@ -130,7 +125,33 @@ class Bill(BaseModel):
     account_id = peewee.ForeignKeyField(Account, backref="bills")
     month = peewee.ForeignKeyField(Month, backref="bills")
     usage = peewee.DecimalField(null=True)
-    support_eligible = peewee.BooleanField(default=True)
+
+    def support_eligible(self):
+        """Accounts must pay 10% charge after 01/08/24 as this was when the OGVA started."""
+        return self.month.date >= datetime.date(2024, 8, 1)
+
+    def support_charge(self) -> Decimal | None:
+        if self.usage is None:
+            return None
+        if self.support_eligible():
+            return self.usage * Decimal(0.1)
+        else:
+            return Decimal(0)
+
+    def total_dollar(self) -> Decimal | None:
+        """Calculate the total bill for the month."""
+        if self.usage is None:
+            return None
+        else:
+            return self.usage + self.support_charge()
+
+    def total_pound(self) -> Decimal | None:
+        """Calculate the total bill for the month."""
+        total_dollar = self.total_dollar()
+        if total_dollar is None:
+            return None
+        else:
+            return  self.total_dollar() * self.month.exchange_rate
 
 
 class RechargeRequest(BaseModel):
