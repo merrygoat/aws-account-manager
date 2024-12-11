@@ -10,6 +10,7 @@ from aam.ui.account_details import UIAccountDetails
 from aam.ui.account_select import UIAccountSelect
 from aam.ui.notes import UIAccountNotes
 from aam.ui.recharges import UIRecharges
+from aam.ui.people import UIPeople
 
 import logging
 logger = logging.getLogger('peewee')
@@ -30,24 +31,31 @@ class UIMainForm:
     def __init__(self):
         self._selected_account: Optional[Account] = None
 
-        with ui.splitter(value=120).props("unit=px").classes('w-full h-full') as splitter:
+        with ui.row().classes('w-full place-content-center'):
+            self.account_select = UIAccountSelect(self)
+        ui.separator()
+
+        with ui.splitter(value=150).props("unit=px").classes('w-full h-full') as splitter:
             with splitter.before:
                 with ui.tabs().props('vertical').classes('w-full') as tabs:
-                    self.accounts_tab = ui.tab('Accounts', icon='account_circle')
+                    self.accounts_tab = ui.tab('Account Details', icon='account_circle')
+                    self.bills_tab = ui.tab('Bills', icon='payments')
+                    self.people_tab = ui.tab('People', icon='face')
                     self.settings_tab = ui.tab('Settings', icon='settings')
             with splitter.after:
                 with ui.tab_panels(tabs, value=self.accounts_tab).props('vertical').classes('w-full h-full'):
                     with ui.tab_panel(self.accounts_tab):
-                        ui.label('Accounts').classes('text-h4')
-                        self.account_select = UIAccountSelect(self)
                         with ui.row().classes('w-full no-wrap'):
-                            with ui.column().classes('w-1/3'):
+                            with ui.column().classes('w-1/2'):
                                 self.account_details = UIAccountDetails(self)
+                            with ui.column().classes('w-1/2'):
                                 self.notes = UIAccountNotes(self)
-                            with ui.column().classes('w-2/3'):
-                                self.bills = UIBills(self)
-                                ui.separator()
-                                self.recharges = UIRecharges(self)
+                    with ui.tab_panel(self.bills_tab):
+                        self.bills = UIBills(self)
+                        ui.separator()
+                        self.recharges = UIRecharges(self)
+                    with ui.tab_panel(self.people_tab):
+                        self.people = UIPeople(self)
                     with ui.tab_panel(self.settings_tab):
                         self.settings = UISettingsDialog(self)
 

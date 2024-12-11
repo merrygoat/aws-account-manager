@@ -1,4 +1,5 @@
 import datetime
+import decimal
 from decimal import Decimal
 
 import peewee
@@ -118,7 +119,7 @@ class Bill(BaseModel):
     id = peewee.AutoField()
     account_id = peewee.ForeignKeyField(Account, backref="bills")
     month = peewee.ForeignKeyField(Month, backref="bills")
-    usage = peewee.DecimalField(null=True)
+    usage: decimal.Decimal = peewee.DecimalField(null=True)
 
     def support_eligible(self):
         """Accounts must pay 10% charge after 01/08/24 as this was when the OGVA started."""
