@@ -17,7 +17,6 @@ logger = logging.getLogger('peewee')
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.DEBUG)
 
-
 @ui.page('/')
 def main():
     initialization.initialize()

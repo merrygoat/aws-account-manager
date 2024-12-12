@@ -4,3 +4,4 @@ __pycache__
 /.idea/
 /aam/data.db
 /data.db
+/config.yaml
