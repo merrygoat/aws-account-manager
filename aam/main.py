@@ -1,6 +1,6 @@
 from typing import Optional
 
-from nicegui import ui
+from nicegui import ui, app
 
 from aam import initialization
 from aam.models import Account
@@ -23,7 +23,7 @@ def main():
     initialization.initialize()
 
     main_form = UIMainForm()
-
+    app.on_exception(lambda e: ui.notify(f"Exception: {e}"))
     ui.run()
 
 
