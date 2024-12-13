@@ -72,4 +72,5 @@ class UIImport:
             bill = Bill.get_or_create(account_id=line[0], month=month.id)[0]
             bill.usage = decimal.Decimal(line[1])
             bill.save()
+        self.parent.bills.update_bill_grid()
         ui.notify("Bills added to accounts.")
