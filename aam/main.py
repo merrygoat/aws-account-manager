@@ -5,6 +5,7 @@ from nicegui import ui
 from aam import initialization
 from aam.models import Account
 from aam.ui.bills import UIBills
+from aam.ui.import_data import UIImport
 from aam.ui.settings import UISettingsDialog
 from aam.ui.account_details import UIAccountDetails
 from aam.ui.account_select import UIAccountSelect
@@ -39,6 +40,7 @@ class UIMainForm:
                 with ui.tabs().props('vertical').classes('w-full') as tabs:
                     self.accounts_tab = ui.tab('Account Details', icon='account_circle')
                     self.bills_tab = ui.tab('Bills', icon='payments')
+                    self.import_tab = ui.tab('Import', icon='publish')
                     self.people_tab = ui.tab('People', icon='face')
                     self.settings_tab = ui.tab('Settings', icon='settings')
             with splitter.after:
@@ -53,6 +55,8 @@ class UIMainForm:
                         self.bills = UIBills(self)
                         ui.separator()
                         self.recharges = UIRecharges(self)
+                    with ui.tab_panel(self.import_tab):
+                        self.import_data = UIImport(self)
                     with ui.tab_panel(self.people_tab):
                         self.people = UIPeople(self)
                     with ui.tab_panel(self.settings_tab):
