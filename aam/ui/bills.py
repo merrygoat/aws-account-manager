@@ -4,7 +4,7 @@ import nicegui.events
 from nicegui import ui
 
 from aam.models import Account, Bill, Month, RechargeRequest, Recharge
-from aam.utilities import get_bill_months
+from aam.utilities import get_months_between
 
 if TYPE_CHECKING:
     from aam.main import UIMainForm
@@ -17,7 +17,7 @@ class UIBills:
         self.bill_grid = ui.aggrid({
             'defaultColDef': {"suppressMovable": True},
             'columnDefs': [{"headerName": "id", "field": "id", "hide": True},
-                           {"headerName": "Month", "field": "date", "sort": "desc"},
+                           {"headerName": "Month", "field": "month_date", "sort": "asc"},
                            {"headerName": "Usage ($)", "field": "usage_dollar", "editable": True,
                             "valueFormatter": "value.toFixed(2)"},
                            {"headerName": "Support Charge ($)", "field": "support_charge",
@@ -36,13 +36,13 @@ class UIBills:
         """This function is run when an account is selected from the dropdown menu."""
         if account.creation_date:
             bills = account.get_bills()
-            required_bill_months = get_bill_months(account.creation_date, account.final_date())
-            actual_bill_months = [bill["date"] for bill in bills]
+            required_bill_months = get_months_between(account.creation_date, account.final_date())
+            actual_bill_months = [bill["month_code"] for bill in bills]
             missing_months = set(required_bill_months) - set(actual_bill_months)
 
             if missing_months:
-                for month in missing_months:
-                    Bill.get_or_create(account_id=account.id, month_id=Month.get(date=month))
+                for month_code in missing_months:
+                    Bill.get_or_create(account_id=account.id, month_id=Month.get(month_code=month_code))
                 bills = account.get_bills()
             self.bill_grid.options["rowData"] = bills
         else:
@@ -76,7 +76,7 @@ class UIBills:
         bills = Bill.select().where(Bill.id.in_(bill_ids))
         for bill in bills:
             if bill.usage is None:
-                ui.notify(f"Cannot add bill for month {bill.month.date} as it has no recorded usage.")
+                ui.notify(f"Cannot add bill for month {str(bill.month)} as it has no recorded usage.")
             else:
                 Recharge.get_or_create(account_id=bill.account_id, month=bill.month.id, recharge_request=selected_recharge_request_id)
         self.update_bill_grid()

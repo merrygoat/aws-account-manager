@@ -1,7 +1,7 @@
 import datetime
 
+import aam.utilities
 from aam.models import Person, Month
-from aam.utilities import get_bill_months
 
 
 def initialize():
@@ -17,10 +17,9 @@ def add_people():
 
 def add_months():
     """This adds a new Month when the app is started for the first time in a given month."""
-    start_date = datetime.date(2021, 1,1)
-    required_months = get_bill_months(start_date, datetime.date.today())
-    actual_months = [month.date for month in Month.select()]
+    required_months = aam.utilities.get_months_between(datetime.date(2021, 1, 1), datetime.date.today())
+    actual_months = [month.month_code for month in Month.select()]
     missing_months = set(required_months) - set(actual_months)
 
-    for month in missing_months:
-        Month.create(date=month, exchange_rate=1)
+    for month_code in missing_months:
+        Month.create(month_code=month_code, exchange_rate=1)

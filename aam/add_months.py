@@ -52,7 +52,7 @@ months = {"Jan-21": 0.740229,
 def main():
     for month, rate in months.items():
         date = datetime.datetime.strptime(month, "%b-%y").date()
-        Month.create(date=date, exchange_rate=rate)
+        Month.create(month_code=date.year * date.month, exchange_rate=rate)
 
 
 if __name__ == "__main__":

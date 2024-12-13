@@ -46,7 +46,7 @@ class UIRecharges:
             ui.notify("No recharge request selected.")
             return 0
         recharge_request = RechargeRequest.get(RechargeRequest.id == request_id)
-        recharges = (Recharge.select(Recharge.id, Recharge.account, Month.date, Month.exchange_rate, Bill.month, Bill.usage, Account.name, Account.finance_code, Account.task_code)
+        recharges = (Recharge.select(Recharge.id, Recharge.account, Month.exchange_rate, Bill.month, Bill.usage, Account.name, Account.finance_code, Account.task_code)
                      .join(Month)
                      .join(Bill, on=((Month.id == Bill.month) & (Recharge.account == Bill.account_id)))
                      .join(Account)
@@ -92,7 +92,7 @@ class UIRecharges:
 
     def update_recharge_grid(self):
         request_id = self.get_selected_recharge_request_id()
-        recharges = (Recharge.select(Recharge.id, Recharge.account, Month.date, Bill.usage, Account.name)
+        recharges = (Recharge.select(Recharge.id, Recharge.account, Month, Bill.usage, Account.name)
                      .join(Month)
                      .join(Bill, on=((Month.id == Bill.month) & (Recharge.account == Bill.account_id)))
                      .join(Account)
@@ -100,7 +100,7 @@ class UIRecharges:
         recharges_list = []
         for recharge in recharges:
             recharges_list.append({"id": recharge.id, "account_name": f"{recharge.month.bill.account_id.name} - {recharge.account_id}",
-                                   "month_date": recharge.month.date.isoformat(), "recharge_amount": recharge.month.bill.usage})
+                                   "month_date": recharge.month.to_date(), "recharge_amount": recharge.month.bill.usage})
         self.recharge_grid.options["rowData"] = recharges_list
         self.recharge_grid.update()
 

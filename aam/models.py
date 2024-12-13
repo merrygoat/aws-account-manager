@@ -1,3 +1,4 @@
+import calendar
 import datetime
 import decimal
 from decimal import Decimal
@@ -49,15 +50,15 @@ class Account(BaseModel):
             end = datetime.date.today()
 
         if self.creation_date:
-            required_months = aam.utilities.get_bill_months(self.creation_date, end)
-            required_bills = (Bill.select(Bill.id, Month.date, Bill.usage, Month.exchange_rate, Recharge.id, RechargeRequest.reference)
+            required_months = aam.utilities.get_months_between(self.creation_date, end)
+            required_bills = (Bill.select(Bill.id, Month.month_code, Bill.usage, Month.exchange_rate, Recharge.id, RechargeRequest.reference)
                               .join(Month)
                               .join(Recharge, JOIN.LEFT_OUTER, on=((Recharge.month == Month.id) & (Recharge.account == Bill.account_id)))
                               .join(RechargeRequest, JOIN.LEFT_OUTER)
-                              .where((Month.date.in_(required_months)) & (Bill.account_id == self.id)))
+                              .where((Month.month_code.in_(required_months)) & (Bill.account_id == self.id)))
 
             for bill in required_bills:
-                new_bill = {"id": bill.id, "date": bill.month.date, "usage_dollar": bill.usage,
+                new_bill = {"id": bill.id, "month_code": bill.month.month_code, "month_date": bill.month.to_date(), "usage_dollar": bill.usage,
                             "support_charge": bill.support_charge(), "total_pound": bill.total_pound()}
                 if hasattr(bill.month, "recharge"):
                     new_bill["recharge_reference"] = bill.month.recharge.recharge_request.reference
@@ -93,27 +94,29 @@ class Note(BaseModel):
 
 class Month(BaseModel):
     id = peewee.AutoField()
-    date = peewee.DateField()
+    month_code: int = peewee.IntegerField()
     exchange_rate = peewee.DecimalField()
 
-    def date_in_month(self, date: datetime.date) -> bool:
-         """Returns true if date is in month."""
-         if (self.date.month == date.month) and (self.date.year == date.year):
-             return True
-         return False
+    @property
+    def year(self) -> int:
+        return (self.month_code - 1) // 12
 
-    def __gt__(self, other: "Month"):
-        return self.date > other.date
+    @property
+    def month(self):
+        """Months start at 1, e.g. Jan = 1, Feb = 2"""
+        month = self.month_code % 12
+        if month == 0:
+            month = 12
+        return month
 
-    def __ge__(self, other: "Month"):
-        return self.date >= other.date
+    def __repr__(self):
+        return f"Month: {calendar.month_abbr[self.month]}-{self.year}"
 
-    def __lt__(self, other: "Month"):
-        return self.date < other.date
+    def __str__(self):
+        return f"{calendar.month_abbr[self.month]}-{self.year}"
 
-    def __le__(self, other: "Month"):
-        return self.date <= other.date
-
+    def to_date(self):
+        return datetime.date(self.year, self.month, 1)
 
 class Bill(BaseModel):
     id = peewee.AutoField()
@@ -123,7 +126,7 @@ class Bill(BaseModel):
 
     def support_eligible(self):
         """Accounts must pay 10% charge after 01/08/24 as this was when the OGVA started."""
-        return self.month.date >= datetime.date(2024, 8, 1)
+        return self.month.month_code >= 2024 * 12 + 8
 
     def support_charge(self) -> Decimal | None:
         if self.usage is None:

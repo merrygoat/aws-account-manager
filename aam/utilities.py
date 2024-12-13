@@ -1,13 +1,13 @@
 import datetime
 
-from dateutil import rrule
 from nicegui import ui
 
 
-def get_bill_months(start_date: datetime.date, end_date: datetime.date) -> list[datetime.date]:
-    start_date = datetime.date(start_date.year, start_date.month, 1)
-    bill_months = [date.date() for date in (rrule.rrule(freq=rrule.MONTHLY, dtstart=start_date, until=end_date))]
-    return bill_months
+def get_months_between(start_date: datetime.date, end_date: datetime.date) -> list[int]:
+    start_date = start_date.year * 12 + start_date.month
+    end_date = end_date.year * 12 + end_date.month
+    return list(range(start_date, end_date + 1))
+
 
 def date_picker() -> ui.input:
     with ui.input().props("dense") as date_input:

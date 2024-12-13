@@ -32,7 +32,7 @@ class UIExchangeRate:
             'rowSelection': 'multiple',
             'stopEditingWhenCellsLoseFocus': True,
         })
-        months = [{"id": month.id, "month": month.date.strftime("%b-%y"), "exchange_rate": month.exchange_rate} for month in Month.select()]
+        months = [{"id": month.id, "month": str(month), "exchange_rate": month.exchange_rate} for month in Month.select()]
         self.month_grid.on("cellValueChanged", self.update_exchange_rate)
         self.month_grid.options["rowData"] = months
         self.month_grid.update()
