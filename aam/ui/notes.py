@@ -29,7 +29,11 @@ class UIAccountNotes:
             ui.button('Add note', on_click=self.add_note_dialog.open)
             ui.button('Edit note', on_click=self.edit_note_dialog.open)
 
-    def update_note_grid(self, account: Account):
+    def update_note_grid(self, account: Account | None):
+        if account is None:
+            self.clear()
+            return 0
+
         notes = [note for note in Note.select().where(Note.account_id == account.id)]
         if notes:
             notes = [{"id": note.id, "date": note.date, "text": note.text} for note in notes]

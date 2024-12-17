@@ -32,8 +32,10 @@ class UIBills:
         self.bill_grid.on("cellValueChanged", self.update_bill)
         self.add_to_recharge_request_button = ui.button("Add selected bills to selected recharge request", on_click=self.add_recharges)
 
-    def initialize(self, account: Account):
+    def initialize(self, account: Account | None):
         """This function is run when an account is selected from the dropdown menu."""
+        if account is None:
+            return 0
         if account.creation_date:
             bills = account.get_bills()
             required_bill_months = get_months_between(account.creation_date, account.final_date())
@@ -50,8 +52,12 @@ class UIBills:
         self.bill_grid.update()
 
     def update_bill_grid(self):
-        bills = self.parent.get_selected_account().get_bills()
-        self.bill_grid.options["rowData"] = bills
+        bills = self.parent.get_selected_account()
+        if bills is None:
+            row_data = []
+        else:
+            row_data = bills.get_bills()
+        self.bill_grid.options["rowData"] = row_data
         self.bill_grid.update()
 
     def update_bill(self, event: nicegui.events.GenericEventArguments):

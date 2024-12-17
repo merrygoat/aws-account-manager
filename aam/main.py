@@ -62,7 +62,7 @@ class UIMainForm:
                     with ui.tab_panel(self.settings_tab):
                         self.settings = UISettingsDialog(self)
 
-    def set_selected_account(self, account: Account):
+    def set_selected_account(self, account: Account | None):
         self._selected_account = account
 
     def get_selected_account(self) -> Optional[Account]:

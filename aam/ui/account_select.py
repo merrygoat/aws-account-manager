@@ -25,7 +25,9 @@ class UIAccountSelect:
         self.update_account_select_options()
 
     def update_account_select_options(self):
+        # Uses implicit dictionary order.
         accounts = {account.id: f"{account.name} ({account.id}) - {account.status}" for account in Account.select()}
+        accounts[None] = "No account selected"
         self.account_select.set_options(accounts)
 
     def account_selected(self, event: nicegui.events.ValueChangeEventArguments):

@@ -128,7 +128,11 @@ class UIAccountDetails:
         self.save_changes.disable()
         self.parent.notes.clear()
 
-    def update(self, account: Account):
+    def update(self, account: Account | None):
+        if account is None:
+            self.clear()
+            return 0
+
         self.sysadmin.enable()
         self.budget_holder.enable()
         self.finance_code.enable()
