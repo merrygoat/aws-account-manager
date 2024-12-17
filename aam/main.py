@@ -6,7 +6,7 @@ from aam import initialization
 from aam.models import Account
 from aam.ui.bills import UIBills
 from aam.ui.import_data import UIImport
-from aam.ui.settings import UISettingsDialog
+from aam.ui.settings import UISettings
 from aam.ui.account_details import UIAccountDetails
 from aam.ui.account_select import UIAccountSelect
 from aam.ui.notes import UIAccountNotes
@@ -64,7 +64,7 @@ class UIMainForm:
                     with ui.tab_panel(self.people_tab):
                         self.people = UIPeople(self)
                     with ui.tab_panel(self.settings_tab):
-                        self.settings = UISettingsDialog(self)
+                        self.settings = UISettings(self)
 
     def set_selected_account(self, account: Account | None):
         self._selected_account = account

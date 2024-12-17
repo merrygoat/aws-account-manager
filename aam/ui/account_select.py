@@ -37,7 +37,7 @@ class UIAccountSelect:
         self.parent.account_details.update(account)
         self.parent.set_selected_account(account)
         self.parent.bills.initialize(account)
-        self.parent.notes.update_note_grid(account)
+        self.parent.notes.update_note_grid()
 
     async def update_account_info(self):
         with ui.dialog() as loadingDialog:

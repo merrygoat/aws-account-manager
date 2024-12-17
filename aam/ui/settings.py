@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     import nicegui.events
 
 
-class UISettingsDialog:
+class UISettings:
     def __init__(self, parent: "UIMainForm"):
         self.parent = parent
 
@@ -20,7 +20,7 @@ class UISettingsDialog:
 
 
 class UIExchangeRate:
-    def __init__(self, parent: UISettingsDialog):
+    def __init__(self, parent: UISettings):
         self.parent = parent
 
         self.month_grid = ui.aggrid({

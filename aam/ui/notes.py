@@ -1,4 +1,3 @@
-import functools
 from datetime import datetime
 from typing import TYPE_CHECKING
 
@@ -26,10 +25,30 @@ class UIAccountNotes:
         self.add_note_dialog = AddNoteDialog(self)
         self.edit_note_dialog = EditNoteDialog(self)
         with ui.row():
-            ui.button('Add note', on_click=self.add_note_dialog.open)
-            ui.button('Edit note', on_click=self.edit_note_dialog.open)
+            ui.button('Add note', on_click=self.add_note_button_press)
+            ui.button('Edit note', on_click=self.edit_note_button_press)
 
-    def update_note_grid(self, account: Account | None):
+    def add_note_button_press(self, event: nicegui.events.ClickEventArguments):
+        selected_account = self.parent.get_selected_account()
+        if selected_account is not None:
+            self.add_note_dialog.open(selected_account)
+        else:
+            ui.notify("No account selected to add note.")
+
+    async def edit_note_button_press(self, event: nicegui.events.ClickEventArguments):
+        selected_account = self.parent.get_selected_account()
+        if selected_account is not None:
+            note_row = await(self.notes_grid.get_selected_row())
+            if note_row:
+                self.edit_note_dialog.open(note_row["id"])
+            else:
+                ui.notify("No note selected to edit.")
+        else:
+            ui.notify("No account selected to edit note.")
+
+    def update_note_grid(self):
+        account = self.parent.get_selected_account()
+
         if account is None:
             self.clear()
             return 0
@@ -50,6 +69,7 @@ class UIAccountNotes:
 class AddNoteDialog:
     def __init__(self, parent: "UIAccountNotes"):
         self.parent = parent
+        self.selected_account: Account | None = None
 
         with ui.dialog() as self.dialog:
             with ui.card():
@@ -66,19 +86,19 @@ class AddNoteDialog:
                         ui.icon('edit_calendar').on('click', menu.open).classes('cursor-pointer')
                 self.text = ui.textarea().props('outlined').classes('w-full')
                 with ui.row():
-                    ui.button("Save note", on_click=functools.partial(self.save_new_note, self.parent))
+                    ui.button("Save note", on_click=self.save_new_note)
                     ui.button("Cancel", on_click=self.close)
 
-    async def save_new_note(self, ui_elements: dict, event: nicegui.events.ClickEventArguments):
-        account_row = await(ui_elements["grid"].get_selected_row())
-        account_id = account_row['id']
+    def save_new_note(self, event: nicegui.events.ClickEventArguments):
         date = self.date.value
         text = self.text.value
-        Note.create(date=date, text=text, account_id=account_id)
+        Note.create(date=date, text=text, account_id=self.selected_account.id)
         self.close()
+        self.parent.update_note_grid()
         ui.notify("New Note saved.")
 
-    def open(self):
+    def open(self, selected_account: Account):
+        self.selected_account = selected_account
         self.dialog.open()
 
     def close(self):
@@ -109,20 +129,19 @@ class EditNoteDialog:
     def close(self):
         self.dialog.close()
 
-    async def open(self, event: nicegui.events.ClickEventArguments):
-        note_row = await(self.parent.notes_grid.get_selected_row())
-        if note_row:
-            note_id = note_row["id"]
-            note = Note.get(id=note_id)
-            self.note_id = note.id
-            self.date_input.value = note.date
-            self.text.value = note.text
-            self.dialog.open()
-        else:
-            ui.notify("No note selected to edit.")
+    def open(self, note_id: int):
+        self.note_id = note_id
+
+        note = Note.get(id=note_id)
+        self.date_input.value = note.date
+        self.text.value = note.text
+        self.dialog.open()
 
     def delete_note(self, event: nicegui.events.ClickEventArguments):
+        Note.delete().where(Note.id == self.note_id).execute()
+        self.parent.update_note_grid()
         self.close()
+        ui.notify("Note deleted")
 
     def save_edit(self, event: nicegui.events.ClickEventArguments):
         existing_note_id = self.note_id
@@ -130,5 +149,6 @@ class EditNoteDialog:
         existing_note.text = self.text.value
         existing_note.date = self.date_input.value
         existing_note.save()
+        self.parent.update_note_grid()
         self.close()
         ui.notify("Changes to Note saved.")
