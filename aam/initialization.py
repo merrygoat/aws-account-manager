@@ -1,5 +1,7 @@
 import datetime
 
+from nicegui import ui
+
 import aam.utilities
 from aam.models import Person, Month
 
@@ -7,6 +9,9 @@ from aam.models import Person, Month
 def initialize():
     add_people()
     add_months()
+    ui.input.default_props("dense outlined")
+    ui.textarea.default_props("outlined")
+    ui.select.default_props("outlined")
 
 def add_people():
     people = [person for person in Person.select()]

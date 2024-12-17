@@ -27,11 +27,11 @@ class UISharedCharges:
             with ui.column().classes('w-1/2'):
                 with ui.grid(columns="auto auto"):
                     ui.label("Name").classes("place-content-center")
-                    self.name = ui.input().props("outlined dense")
+                    self.name = ui.input()
                     ui.label("Amount").classes("place-content-center")
-                    self.amount = ui.input().props("outlined dense")
+                    self.amount = ui.input()
                     ui.label("Accounts").classes("place-content-center")
-                    self.accounts = ui.select(options=[]).props("outlined dense")
+                    self.accounts = ui.select(options=[])
                     self.save_changes = ui.button("Save Changes", on_click=self.save_changes)
 
         self.populate_shared_charges_table()

@@ -84,7 +84,7 @@ class AddNoteDialog:
                                 ui.button('Close', on_click=menu.close).props('flat')
                     with self.date.add_slot('append'):
                         ui.icon('edit_calendar').on('click', menu.open).classes('cursor-pointer')
-                self.text = ui.textarea().props('outlined').classes('w-full')
+                self.text = ui.textarea().classes('w-full')
                 with ui.row():
                     ui.button("Save note", on_click=self.save_new_note)
                     ui.button("Cancel", on_click=self.close)
@@ -120,7 +120,7 @@ class EditNoteDialog:
                                 ui.button('Close', on_click=menu.close).props('flat')
                     with self.date_input.add_slot('append'):
                         ui.icon('edit_calendar').on('click', menu.open).classes('cursor-pointer')
-                self.text = ui.textarea().props('outlined').classes('w-full')
+                self.text = ui.textarea().classes('w-full')
                 with ui.row():
                     ui.button("Save note", on_click=self.save_edit)
                     ui.button("Delete note", on_click=self.delete_note)
