@@ -165,4 +165,20 @@ class Recharge(BaseModel):
     recharge_request = peewee.ForeignKeyField(RechargeRequest, backref="recharges")
 
 
-db.create_tables([Account, LastAccountUpdate, Person, Sysadmin, Note, Month, Bill, Recharge, RechargeRequest])
+class SharedCharge(BaseModel):
+    id = peewee.AutoField()
+    name = peewee.TextField()
+    amount = peewee.DecimalField()
+    month_id = peewee.ForeignKeyField(Month, backref="shared_charges")
+
+    def to_dict(self):
+        return {"name": self.name, "amount": self.amount}
+
+class AccountJoinSharedCharge(BaseModel):
+    id = peewee.AutoField()
+    account_id = peewee.ForeignKeyField(Account, backref="shared_charges_join")
+    shared_charge_id = peewee.ForeignKeyField(SharedCharge, backref="account_join")
+
+
+db.create_tables([Account, LastAccountUpdate, Person, Sysadmin, Note, Month, Bill, Recharge, RechargeRequest,
+                  SharedCharge, AccountJoinSharedCharge])

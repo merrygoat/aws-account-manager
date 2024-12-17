@@ -12,6 +12,7 @@ from aam.ui.account_select import UIAccountSelect
 from aam.ui.notes import UIAccountNotes
 from aam.ui.recharges import UIRecharges
 from aam.ui.people import UIPeople
+from aam.ui.shared_charges import UISharedCharges
 
 import logging
 logger = logging.getLogger('peewee')
@@ -40,6 +41,7 @@ class UIMainForm:
                 with ui.tabs().props('vertical').classes('w-full') as tabs:
                     self.accounts_tab = ui.tab('Account Details', icon='account_circle')
                     self.bills_tab = ui.tab('Bills', icon='payments')
+                    self.shared_charges_tab = ui.tab('Shared Charges', icon='attach_money')
                     self.import_tab = ui.tab('Import', icon='publish')
                     self.people_tab = ui.tab('People', icon='face')
                     self.settings_tab = ui.tab('Settings', icon='settings')
@@ -55,6 +57,8 @@ class UIMainForm:
                         self.bills = UIBills(self)
                         ui.separator()
                         self.recharges = UIRecharges(self)
+                    with ui.tab_panel(self.shared_charges_tab):
+                        self.shared_charges = UISharedCharges(self)
                     with ui.tab_panel(self.import_tab):
                         self.import_data = UIImport(self)
                     with ui.tab_panel(self.people_tab):
