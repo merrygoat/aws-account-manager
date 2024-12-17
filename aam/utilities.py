@@ -19,3 +19,7 @@ def date_picker() -> ui.input:
             ui.icon('edit_calendar').on('click', account_creation_menu.open).classes('cursor-pointer')
 
     return date_input
+
+
+def month_code(year: int, month: int) -> int:
+    return year * 12 + month
