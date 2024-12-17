@@ -1,4 +1,4 @@
-from datetime import datetime
+import datetime
 from typing import TYPE_CHECKING
 
 import nicegui.events
@@ -75,7 +75,7 @@ class AddNoteDialog:
             with ui.card():
                 self.title = ui.html("Add Note").classes("text-2xl")
                 with ui.input('Date',
-                              value=datetime.today().strftime("%d/%m/%y"),
+                              value=datetime.datetime.today().strftime("%d/%m/%y"),
                               validation={"Must provide date": lambda value: len(value) > 1}
                               ) as self.date:
                     with ui.menu().props('no-parent-event') as menu:
@@ -144,10 +144,20 @@ class EditNoteDialog:
         ui.notify("Note deleted")
 
     def save_edit(self, event: nicegui.events.ClickEventArguments):
+        date = self.date_input.value
+        if not date:
+            ui.notify("Must input date.")
+            return 0
+        try:
+            date = datetime.date.fromisoformat(date)
+        except ValueError as e:
+            ui.notify(f"Note date is not valid: {e.args[0]}")
+            return 0
+
         existing_note_id = self.note_id
         existing_note = Note.get(id=existing_note_id)
         existing_note.text = self.text.value
-        existing_note.date = self.date_input.value
+        existing_note.date = date
         existing_note.save()
         self.parent.update_note_grid()
         self.close()

@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 import nicegui.events
 from nicegui import ui
 
+import aam.utilities
 from aam.models import Account, Person, Sysadmin
 
 if TYPE_CHECKING:
@@ -39,21 +40,9 @@ class UIAccountDetails:
             ui.label("Sysadmin email:")
             self.sysadmin_email = ui.label("")
             ui.label("Creation date").classes("place-content-center")
-            with ui.input('Date').props("dense") as self.account_creation_input:
-                with ui.menu().props('no-parent-event') as account_creation_menu:
-                    with ui.date().bind_value(self.account_creation_input) as self.account_creation_date:
-                        with ui.row().classes('justify-end'):
-                            ui.button('Close', on_click=account_creation_menu.close).props('flat')
-                with self.account_creation_input.add_slot('append'):
-                    ui.icon('edit_calendar').on('click', account_creation_menu.open).classes('cursor-pointer')
+            self.account_creation_input = aam.utilities.date_picker()
             ui.label("Closure date").classes("place-content-center")
-            with ui.input('Date').props("dense") as self.account_closure_input:
-                with ui.menu().props('no-parent-event') as account_closure_menu:
-                    with ui.date().bind_value(self.account_closure_input) as self.account_closure_date:
-                        with ui.row().classes('justify-end'):
-                            ui.button('Close', on_click=account_closure_menu.close).props('flat')
-                with self.account_closure_input.add_slot('append'):
-                    ui.icon('edit_calendar').on('click', account_closure_menu.open).classes('cursor-pointer')
+            self.account_closure_input = aam.utilities.date_picker()
         with ui.column().classes("items-end w-full"):
             self.save_changes = ui.button("Save Changes", on_click=self.save_account_changes)
 
@@ -65,6 +54,26 @@ class UIAccountDetails:
 
     def save_account_changes(self):
         account: Account = Account.get(Account.id == self.account_id.text)
+
+        account_creation_date = self.account_creation_input.value
+        if account_creation_date:
+            try:
+                account_creation_date = datetime.date.fromisoformat(account_creation_date)
+            except ValueError as e:
+                ui.notify(f"Account creation date is not valid: {e.args[0]}")
+                return 0
+            else:
+                account.creation_date = account_creation_date
+
+        account_closure_date = self.account_closure_input.value
+        if account_closure_date:
+            try:
+                account_closure_date = datetime.date.fromisoformat(account_closure_date)
+            except ValueError as e:
+                ui.notify(f"Account closure date is not valid: {e.args[0]}")
+            else:
+                account.closure_date = account_closure_date
+
         selected_sysadmin = self.sysadmin.value
         if selected_sysadmin:
             selected_sysadmin = Person.get(Person.id == selected_sysadmin)
@@ -80,15 +89,7 @@ class UIAccountDetails:
         ui.notify("Record updated.")
         account.finance_code = self.finance_code.value
         account.task_code = self.task_code.value
-        account_creation_date = self.account_creation_date.value
-        if account_creation_date:
-            account_creation_date = datetime.date.fromisoformat(account_creation_date)
-        account.creation_date = account_creation_date
 
-        account_closure_date = self.account_closure_date.value
-        if account_closure_date:
-            account_closure_date = datetime.date.fromisoformat(account_closure_date)
-        account.closure_date = account_closure_date
         account.save()
         self.parent.bills.update_bill_grid()
 
@@ -161,11 +162,11 @@ class UIAccountDetails:
             self.sysadmin.set_value(None)
 
         if account.creation_date:
-            self.account_creation_date.value = account.creation_date.isoformat()
+            self.account_creation_input.value = account.creation_date.isoformat()
         else:
             self.account_creation_input.value = ""
 
         if account.closure_date:
-            self.account_closure_date.value = account.closure_date.isoformat()
+            self.account_closure_input.value = account.closure_date.isoformat()
         else:
-            self.account_closure_date.value = ""
+            self.account_closure_input.value = ""
