@@ -12,6 +12,7 @@ def initialize():
     ui.input.default_props("dense outlined")
     ui.textarea.default_props("outlined")
     ui.select.default_props("outlined")
+    ui.label.default_classes("place-content-center")
 
 def add_people():
     people = [person for person in Person.select()]

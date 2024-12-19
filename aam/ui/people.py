@@ -21,11 +21,11 @@ class UIPeople:
                 ui.html("Person details").classes("text-2xl")
                 self.person_select = ui.select(options=[], label="Person", on_change=self.show_person_details).classes("min-w-[400px]").props('popup-content-class="!max-h-[500px]"')
                 with ui.grid(columns="auto auto"):
-                    ui.label("First Name").classes("place-content-center")
+                    ui.label("First Name")
                     self.first_name = ui.input()
-                    ui.label("Surname").classes("place-content-center")
+                    ui.label("Surname")
                     self.last_name = ui.input()
-                    ui.label("Email").classes("place-content-center")
+                    ui.label("Email")
                     self.email = ui.input()
             with ui.column().classes('w-1/2'):
                 ui.html("Person roles").classes("text-2xl")
@@ -91,11 +91,11 @@ class AddPersonDialog:
             with ui.card():
                 self.title = ui.html("Add Person").classes("text-2xl")
                 with ui.grid(columns="auto auto"):
-                    ui.label("First Name").classes("place-content-center")
+                    ui.label("First Name")
                     self.first_name = ui.input()
-                    ui.label("Surname").classes("place-content-center")
+                    ui.label("Surname")
                     self.last_name = ui.input()
-                    ui.label("Email").classes("place-content-center")
+                    ui.label("Email")
                     self.email = ui.input()
                 with ui.row():
                     ui.button("Save Person", on_click=self.save_new_person)

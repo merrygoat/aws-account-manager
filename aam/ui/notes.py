@@ -73,7 +73,7 @@ class AddNoteDialog:
 
         with ui.dialog() as self.dialog:
             with ui.card():
-                self.title = ui.html("Add Note").classes("text-2xl")
+                ui.html("Add Note").classes("text-2xl")
                 with ui.input('Date',
                               value=datetime.datetime.today().strftime("%d/%m/%y"),
                               validation={"Must provide date": lambda value: len(value) > 1}
@@ -112,7 +112,7 @@ class EditNoteDialog:
 
         with ui.dialog() as self.dialog:
             with ui.card():
-                self.title = ui.html("Edit Note").classes("text-2xl")
+                ui.html("Edit Note").classes("text-2xl")
                 with ui.input('Date', validation={"Must provide date": lambda value: len(value) > 1}) as self.date_input:
                     with ui.menu().props('no-parent-event') as menu:
                         with ui.date(mask="DD-MM-YY").bind_value(self.date_input):
