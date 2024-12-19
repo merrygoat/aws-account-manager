@@ -1,4 +1,3 @@
-import calendar
 import datetime
 import decimal
 from typing import TYPE_CHECKING
@@ -8,6 +7,7 @@ from nicegui import ui
 
 import aam.utilities
 from aam.models import Account, Month, Bill
+from aam.utilities import month_select, year_select
 
 if TYPE_CHECKING:
     from aam.main import UIMainForm
@@ -23,8 +23,8 @@ class UIImport:
         with ui.grid(columns="auto auto").classes("place-items-center gap-1") as self.date_pick_grid:
             self.label = ui.label("Month")
             self.label = ui.label("Year")
-            self.month = ui.select(options={index + 1: month for index, month in enumerate(calendar.month_abbr[1:])}).props("dense").classes("min-w-[120px]")
-            self.year = ui.select(options=list(range(2021, datetime.date.today().year + 1))).props("dense").classes("min-w-[120px]")
+            self.month = month_select()
+            self.year = year_select()
         self.import_textbox = ui.textarea("Raw data").classes("w-1/2")
         self.import_button = ui.button("Import data", on_click=self.import_data)
 

@@ -1,3 +1,4 @@
+import calendar
 import datetime
 import re
 
@@ -20,6 +21,14 @@ def date_picker() -> ui.input:
             ui.icon('edit_calendar').on('click', account_creation_menu.open).classes('cursor-pointer')
 
     return date_input
+
+
+def month_select() -> ui.select:
+    return ui.select(options={index + 1: month for index, month in enumerate(calendar.month_abbr[1:])}).props("dense").classes("min-w-[120px]")
+
+
+def year_select() -> ui.select:
+    return ui.select(options=list(range(2021, datetime.date.today().year + 1))).props("dense").classes("min-w-[120px]")
 
 
 def month_code(year: int, month: int) -> int:
