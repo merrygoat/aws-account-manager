@@ -16,7 +16,7 @@ class UISharedCharges:
     def __init__(self, parent: "UIMainForm"):
         self.parent = parent
 
-        self.add_shared_charge_dialog = UINewSharedChangeDialog(self)
+        self.shared_charge_dialog = UISharedChargeDialog(self)
 
         ui.html("Shared Charges").classes("text-2xl")
         with ui.row().classes("w-full no-wrap"):
@@ -34,13 +34,25 @@ class UISharedCharges:
                     }
                 })
                 with ui.row():
-                    self.new_charge_button = ui.button("New Shared Charge", on_click=self.add_shared_charge_dialog.open)
+                    self.new_charge_button = ui.button("New Shared Charge", on_click=self.add_new_shared_charge)
+                    self.edit_selected_button = ui.button("Edit Selected Shared Charge", on_click=self.edit_selected)
                     self.delete_selected_button = ui.button("Delete Selected Shared Charge", on_click=self.delete_selected)
 
         self.populate_shared_charges_table()
 
-    def save_changes(self, event: nicegui.events.ClickEventArguments):
-        pass
+    async def edit_selected(self, event: nicegui.events.ClickEventArguments):
+        selected_row = await self.shared_charges_table.get_selected_row()
+        if selected_row is None:
+            ui.notify("No shared charge selected.")
+            return 0
+        else:
+            shared_charge = SharedCharge.get(SharedCharge.id==selected_row["id"])
+            self.shared_charge_dialog.header = "Editing existing Shared Charge"
+            self.shared_charge_dialog.open(shared_charge)
+
+    def add_new_shared_charge(self, event: nicegui.events.ClickEventArguments):
+        self.shared_charge_dialog.header = "Add New Shared Charge"
+        self.shared_charge_dialog.open()
 
     async def delete_selected(self, event: nicegui.events.ClickEventArguments):
         selected_row = await self.shared_charges_table.get_selected_row()
@@ -60,15 +72,15 @@ class UISharedCharges:
         self.shared_charges_table.update()
 
 
-class UINewSharedChangeDialog:
+class UISharedChargeDialog:
     def __init__(self, parent: UISharedCharges):
         self.parent = parent
 
-        self.accounts = []
+        self.shared_charge_id: int | None = None
 
         with ui.dialog() as self.dialog:
             with ui.card():
-                ui.html("Add New Shared Charge").classes("text-2xl")
+                self.header = ui.html("").classes("text-2xl")
                 with ui.grid(columns="auto auto"):
                     ui.label("Name")
                     self.name = ui.input()
@@ -86,7 +98,7 @@ class UINewSharedChangeDialog:
                     ui.label("Show closed accounts")
                     self.show_closed = ui.checkbox(on_change=self.update_account_select, value=False)
                 with ui.row():
-                    ui.button("Save Changes", on_click=self.create_new_shared_charge)
+                    ui.button("Save Changes", on_click=self.save_shared_charge)
                     ui.button("Cancel", on_click=self.dialog.close)
             self.update_account_select()
 
@@ -100,7 +112,7 @@ class UINewSharedChangeDialog:
         accounts = {account.id: account.name for account in accounts}
         self.account_select.set_options(accounts)
 
-    def create_new_shared_charge(self, event: nicegui.events.ClickEventArguments):
+    def save_shared_charge(self, event: nicegui.events.ClickEventArguments):
         if self.name == "":
             ui.notify("Name must be provided.")
             return 0
@@ -112,15 +124,58 @@ class UINewSharedChangeDialog:
             return 0
 
         month = Month.get(month_code=month_code(self.year.value, self.month.value))
-        shared_charge = SharedCharge.create(name=self.name.value, amount=amount, month_id=month.id)
-        for account_id in self.account_select.value:
-            AccountJoinSharedCharge.create(account_id=account_id, shared_charge_id=shared_charge.id)
-        self.parent.populate_shared_charges_table()
-        self.close()
-        ui.notify("New shared charge added.")
 
-    def open(self):
+        if self.shared_charge_id:
+            # Get existing SharedCharge and the accounts to which it applies
+            shared_charge = SharedCharge.get(SharedCharge.id == self.shared_charge_id)
+            accounts = (Account.select(Account.id).where(SharedCharge.id == self.shared_charge_id)
+                        .join(AccountJoinSharedCharge)
+                        .join(SharedCharge).dicts())
+            account_ids = [account["id"] for account in accounts]
+            ids_to_add = set(self.account_select.value) - set(account_ids)
+            ids_to_delete = set(account_ids) - set(self.account_select.value)
+
+            # Add any newly selected accounts
+            for account_id in ids_to_add:
+                AccountJoinSharedCharge.create(account_id=account_id, shared_charge_id=shared_charge.id)
+
+            # Delete any accounts no longer selected
+            (AccountJoinSharedCharge.delete()
+             .where((AccountJoinSharedCharge.account_id.in_(ids_to_delete)) & (AccountJoinSharedCharge.shared_charge_id == shared_charge.id))
+             .execute())
+
+            shared_charge.name = self.name.value
+            shared_charge.amount = self.amount
+            shared_charge.month_id = month.id
+        else:
+            shared_charge = SharedCharge.create(name=self.name.value, amount=amount, month_id=month.id)
+            for account_id in self.account_select.value:
+                AccountJoinSharedCharge.create(account_id=account_id, shared_charge_id=shared_charge.id)
+
+        self.parent.populate_shared_charges_table()
+        if self.shared_charge_id:
+            ui.notify("Shared charge edited.")
+        else:
+            ui.notify("New shared charge added.")
+        self.close()
+
+    def open(self, shared_charge: SharedCharge | None):
+        if shared_charge:
+            self.shared_charge_id = shared_charge.id
+            month = Month.get(Month.id == shared_charge.month_id)
+            accounts = (Account.select(Account.id).where(SharedCharge.id == shared_charge.id)
+                           .join(AccountJoinSharedCharge)
+                           .join(SharedCharge).dicts())
+            account_ids = [account["id"] for account in accounts]
+
+            self.name.value = shared_charge.name
+            self.month.value = month.month
+            self.year.value = month.year
+            self.amount.value = str(shared_charge.amount)
+            self.account_select.value = account_ids
+
         self.dialog.open()
 
     def close(self):
+        self.shared_charge_id = None
         self.dialog.close()
