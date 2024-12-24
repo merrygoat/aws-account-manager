@@ -172,12 +172,20 @@ class SharedCharge(BaseModel):
     month_id = peewee.ForeignKeyField(Month, backref="shared_charges")
 
     def to_dict(self):
-        return {"name": self.name, "amount": self.amount}
+        month = Month.get(Month.id == self.month_id)
+        charges = (SharedCharge.select(Account.name).where(SharedCharge.id == self.id)
+                   .join(AccountJoinSharedCharge)
+                   .join(Account).dicts())
+        account_names = [charge["name"] for charge in charges]
+        account_names = ", ".join(sorted(account_names))
+
+        return {"id": self.id, "name": self.name, "amount": self.amount, "month": str(month),
+                "account_names": account_names}
 
 class AccountJoinSharedCharge(BaseModel):
     id = peewee.AutoField()
     account_id = peewee.ForeignKeyField(Account, backref="shared_charges_join")
-    shared_charge_id = peewee.ForeignKeyField(SharedCharge, backref="account_join")
+    shared_charge_id = peewee.ForeignKeyField(SharedCharge, backref="account_join", on_delete="CASCADE")
 
 
 db.create_tables([Account, LastAccountUpdate, Person, Sysadmin, Note, Month, Bill, Recharge, RechargeRequest,
