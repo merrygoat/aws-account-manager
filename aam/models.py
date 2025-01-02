@@ -27,10 +27,14 @@ class Person(BaseModel):
     def full_name(self) -> str:
         return f"{self.first_name} {self.last_name}"
 
+class Organization(BaseModel):
+    id = peewee.CharField(primary_key=True)
+    name = peewee.CharField(null=True)
 
 class Account(BaseModel):
     id = peewee.CharField(primary_key=True)
     name = peewee.CharField()
+    organization = peewee.ForeignKeyField(Organization, backref='accounts', null=True)
     email = peewee.CharField()
     status = peewee.CharField()   # ACTIVE, SUSPENDED or Closed
     budget_holder = peewee.ForeignKeyField(Person, backref="budget_holder", null=True)
@@ -204,4 +208,4 @@ class AccountJoinSharedCharge(BaseModel):
 
 
 db.create_tables([Account, LastAccountUpdate, Person, Sysadmin, Note, Month, Bill, Recharge, RechargeRequest,
-                  SharedCharge, AccountJoinSharedCharge])
+                  SharedCharge, AccountJoinSharedCharge, Organization])

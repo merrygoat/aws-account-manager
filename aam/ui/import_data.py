@@ -71,7 +71,7 @@ class UIImport:
                 Month.create(month_code=month_code, exchange_rate=exchange_rate)
             month.exchange_rate = exchange_rate
             month.save()
-        self.parent.settings.exchange_rate_grid.populate_exchange_rate_grid()
+        self.parent.settings.ui_exchange_rate.populate_exchange_rate_grid()
         ui.notify("Exchange rates imported.")
 
     def import_billing(self):

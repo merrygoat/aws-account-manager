@@ -6,7 +6,7 @@ import nicegui.events
 from nicegui import ui
 
 import aam.aws
-from aam.models import Account, LastAccountUpdate
+from aam.models import Account, LastAccountUpdate, Organization
 
 if TYPE_CHECKING:
     from aam.main import UIMainForm
@@ -72,8 +72,18 @@ class UIAccountSelect:
 
 def get_and_process_account_info():
 
-    account_info = aam.aws.get_accounts("hrds-management")
+    account_info = aam.aws.get_accounts()
     account_info = [account for account in account_info if "SBSL" not in account["Name"]]
+
+    if not account_info:
+        ui.notify("No accounts found in organization. This is probably a permissions error.")
+        return 0
+
+    # Get organization from ARN
+    organization_id = account_info[0]["Arn"].split("/")[1]
+    organization = Organization.get_or_create(id=organization_id)[0]
+
+    # Reorganize list into dict for convenient access
     account_info = {account["Id"]: account for account in account_info}
 
     # Loop through all accounts in DB checking against data from AWS updating as necessary.
@@ -83,11 +93,13 @@ def get_and_process_account_info():
             account.status = "Closed"
         else:
             account.status = account_info[account_id]["Status"]
+        if account.organization is None:
+            account.organization = organization.id
         account.save()
 
     # Loop through all account in AWS data, adding any that are not in the DB to the DB
     for account_id, account_details in account_info.items():
         if account_id not in db_accounts:
-            Account.create(id=account_details["Id"], name=account_details["Name"], email=account_details["Email"], status=account_details["Status"])
+            Account.create(id=account_details["Id"], name=account_details["Name"], email=account_details["Email"], status=account_details["Status"], organization=organization.id)
 
     LastAccountUpdate.replace(id=0, time=datetime.datetime.now()).execute()

@@ -5,14 +5,12 @@ import boto3
 from aam.config import CONFIG
 
 
-def get_accounts(sso_profile_name: str) -> list[dict]:
-    session = boto3.Session(profile_name=sso_profile_name)
+def get_accounts() -> list[dict]:
     return get_organisation_accounts()
 
 
 def get_organisation_accounts(include_suspended: bool = True) -> list[dict]:
     """Get a list of accounts in the organization."""
-    a = os.environ
 
     sts_connection = boto3.client('sts')
     acct_b = sts_connection.assume_role(
