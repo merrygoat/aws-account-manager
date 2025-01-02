@@ -56,11 +56,11 @@ class UIBills:
         self.bill_grid.update()
 
     def update_bill_grid(self):
-        bills = self.parent.get_selected_account()
-        if bills is None:
+        account = self.parent.get_selected_account()
+        if account is None:
             row_data = []
         else:
-            row_data = bills.get_bills()
+            row_data = account.get_bills()
         self.bill_grid.options["rowData"] = row_data
         self.bill_grid.update()
 

@@ -66,7 +66,7 @@ class UISharedCharges:
             ui.notify("Shared charge deleted.")
 
     def populate_shared_charges_table(self):
-        shared_charges = SharedCharge.select()
+        shared_charges = SharedCharge.select().where(SharedCharge.organization == self.parent.get_selected_organization_id())
         shared_charges = [charge.to_dict() for charge in shared_charges]
         self.shared_charges_table.options["rowData"] = shared_charges
         self.shared_charges_table.update()
@@ -100,15 +100,17 @@ class UISharedChargeDialog:
                 with ui.row():
                     ui.button("Save Changes", on_click=self.save_shared_charge)
                     ui.button("Cancel", on_click=self.dialog.close)
-            self.update_account_select()
 
     def update_account_select(self):
+        selected_org_id = self.parent.parent.get_selected_organization_id()
+        if not selected_org_id:
+            return 0
         status = ["ACTIVE"]
         if self.show_suspended.value:
             status.append("SUSPENDED")
         if self.show_closed.value:
             status.append("Closed")
-        accounts = Account.select().where(Account.status.in_(status))
+        accounts = Account.select().where((Account.status.in_(status)) & (Account.organization==selected_org_id))
         accounts = {account.id: account.name for account in accounts}
         self.account_select.set_options(accounts)
 
@@ -149,7 +151,8 @@ class UISharedChargeDialog:
             shared_charge.month_id = month.id
             shared_charge.save()
         else:
-            shared_charge = SharedCharge.create(name=self.name.value, amount=amount, month_id=month.id)
+            shared_charge = SharedCharge.create(name=self.name.value, amount=amount, month_id=month.id,
+                                                organization=self.parent.parent.get_selected_organization_id())
             for account_id in self.account_select.value:
                 AccountJoinSharedCharge.create(account_id=account_id, shared_charge_id=shared_charge.id)
 
@@ -160,7 +163,9 @@ class UISharedChargeDialog:
             ui.notify("New shared charge added.")
         self.close()
 
-    def open(self, shared_charge: SharedCharge | None):
+    def open(self, shared_charge: SharedCharge | None = None):
+        self.update_account_select()
+
         if shared_charge:
             self.shared_charge_id = shared_charge.id
             month = Month.get(Month.id == shared_charge.month_id)

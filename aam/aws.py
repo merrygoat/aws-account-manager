@@ -4,7 +4,7 @@ import nicegui.ui as ui
 from aam.config import CONFIG
 
 
-def get_organization_accounts(org_id: str, include_suspended: bool = True) -> list[dict]:
+def get_organization_accounts(org_id: str) -> list[dict]:
     """Get a list of accounts in the organization."""
 
     org_role_arns = CONFIG["organization_list_role_arns"]
@@ -30,6 +30,4 @@ def get_organization_accounts(org_id: str, include_suspended: bool = True) -> li
     while "NextToken" in response:
         response = org_client.list_accounts(NextToken=response["NextToken"])
         accounts.extend(response["Accounts"])
-    if not include_suspended:
-        accounts = [account for account in accounts if account["Status"] != "SUSPENDED"]
     return accounts

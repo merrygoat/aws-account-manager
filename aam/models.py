@@ -183,6 +183,7 @@ class SharedCharge(BaseModel):
     id = peewee.AutoField()
     name = peewee.TextField()
     amount: decimal.Decimal = peewee.DecimalField()
+    organization = peewee.ForeignKeyField(Organization, backref="shared_charges")
     month_id = peewee.ForeignKeyField(Month, backref="shared_charges")
 
     def to_dict(self):

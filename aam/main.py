@@ -3,7 +3,7 @@ from typing import Optional
 from nicegui import ui, app
 
 from aam import initialization
-from aam.models import Account
+from aam.models import Account, Organization
 from aam.ui.bills import UIBills
 from aam.ui.import_data import UIImport
 from aam.ui.settings import UISettings
@@ -30,6 +30,7 @@ def main():
 
 class UIMainForm:
     def __init__(self):
+        self._selected_organization_id: Optional[str] = None
         self._selected_account: Optional[Account] = None
 
         with ui.row().classes('w-full place-content-center'):
@@ -65,6 +66,15 @@ class UIMainForm:
                         self.people = UIPeople(self)
                     with ui.tab_panel(self.settings_tab):
                         self.settings = UISettings(self)
+
+        # This has to be called after all UI elements are created as it references some others
+        self.account_select.select_default_org()
+
+    def set_selected_organization_id(self, org_id: str | None):
+        self._selected_organization_id = org_id
+
+    def get_selected_organization_id(self) -> Optional[str]:
+        return self._selected_organization_id
 
     def set_selected_account(self, account: Account | None):
         self._selected_account = account

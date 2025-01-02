@@ -33,14 +33,10 @@ class UIAccountSelect:
         self.update_organization_select_options()
         self.update_account_select_options()
 
-
     def update_organization_select_options(self):
         orgs = Organization.select()
         orgs = {org.id: f"{org.name} ({org.id})" for org in orgs}
         self.organization_select.set_options(orgs)
-        # Get the id of the first org in the dict
-        first_org = next(iter(orgs))
-        self.organization_select.set_value(first_org)
 
     def update_account_select_options(self):
         organization_id = self.organization_select.value
@@ -59,8 +55,11 @@ class UIAccountSelect:
         self.account_select.set_options(accounts)
 
     def organization_selected(self, event: nicegui.events.ValueChangeEventArguments):
+        selected_org_id = event.sender.value
         self.update_account_select_options()
-        self.update_last_updated_label(event.sender.value)
+        self.parent.set_selected_organization_id(selected_org_id)
+        self.parent.shared_charges.populate_shared_charges_table()
+        self.update_last_updated_label(selected_org_id)
 
     def account_selected(self, event: nicegui.events.ValueChangeEventArguments):
         selected_account_id = event.sender.value
@@ -91,6 +90,11 @@ class UIAccountSelect:
                 text = "None"
         self.last_updated.set_text(f"Account information last updated: {text}")
 
+    def select_default_org(self):
+        # Get the id of the first org in the dict
+        first_org = next(iter(self.organization_select.options))
+        self.organization_select.set_value(first_org)
+
 
 def get_and_process_account_info(org_id: str):
 
@@ -104,7 +108,7 @@ def get_and_process_account_info(org_id: str):
         return 0
 
     # Loop through all accounts in DB checking against data from AWS updating as necessary.
-    db_accounts = {account.id: account for account in Account.select()}
+    db_accounts = {account.id: account for account in Account.select().where(Account.organization==org_id)}
     for account_id, account in db_accounts.items():
         if account_id not in account_info:
             account.status = "Closed"
