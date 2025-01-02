@@ -32,7 +32,7 @@ class Account(BaseModel):
     id = peewee.CharField(primary_key=True)
     name = peewee.CharField()
     email = peewee.CharField()
-    status = peewee.CharField()
+    status = peewee.CharField()   # ACTIVE, SUSPENDED or Closed
     budget_holder = peewee.ForeignKeyField(Person, backref="budget_holder", null=True)
     finance_code = peewee.CharField(null=True)
     task_code = peewee.CharField(null=True)

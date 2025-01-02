@@ -16,8 +16,14 @@ class UIAccountSelect:
     def __init__(self, parent: "UIMainForm"):
         self.parent = parent
 
-        with ui.row():
+        with ui.column().classes('h-full place-content-center'):
             self.account_select = ui.select(label="Account", options={}, on_change=self.account_selected).classes("min-w-[400px]").props('popup-content-class="!max-h-[500px]"')
+        with ui.grid(columns="auto auto").style("gap: 0"):
+            ui.label("Show closed accounts")
+            self.show_closed = ui.checkbox(on_change=self.update_account_select_options)
+            ui.label("Show suspended accounts")
+            self.show_suspended = ui.checkbox(on_change=self.update_account_select_options)
+        with ui.column():
             self.update_button = ui.button("Update Account Info", on_click=self.update_account_info)
             self.last_updated = ui.label()
 
@@ -26,8 +32,15 @@ class UIAccountSelect:
 
     def update_account_select_options(self):
         # Uses implicit dictionary order.
+        valid_status = ["ACTIVE"]
+        if self.show_closed.value is True:
+            valid_status.append("Closed")
+        if self.show_suspended.value is True:
+            valid_status.append("SUSPENDED")
+
         accounts = {None: "No account selected"}
-        accounts.update({account.id: f"{account.name} ({account.id}) - {account.status}" for account in Account.select()})
+        accounts.update({account.id: f"{account.name} ({account.id}) - {account.status}"
+                         for account in Account.select() if account.status in valid_status})
         self.account_select.set_options(accounts)
 
     def account_selected(self, event: nicegui.events.ValueChangeEventArguments):
