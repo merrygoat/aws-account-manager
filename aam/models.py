@@ -89,7 +89,8 @@ class Sysadmin(BaseModel):
 
 class LastAccountUpdate(BaseModel):
     id = peewee.IntegerField(primary_key=True)
-    time = peewee.DateTimeField()
+    organization = peewee.ForeignKeyField(Organization, backref="last_updated_time")
+    time = peewee.DateTimeField(null=True)
 
 class Note(BaseModel):
     id = peewee.AutoField()

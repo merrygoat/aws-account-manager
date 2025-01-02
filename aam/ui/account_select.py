@@ -29,7 +29,7 @@ class UIAccountSelect:
             self.update_button = ui.button("Update Account Info", on_click=self.update_account_info)
             self.last_updated = ui.label()
 
-        self.update_last_updated_label()
+        self.update_last_updated_label(self.organization_select.value)
         self.update_organization_select_options()
         self.update_account_select_options()
 
@@ -60,6 +60,7 @@ class UIAccountSelect:
 
     def organization_selected(self, event: nicegui.events.ValueChangeEventArguments):
         self.update_account_select_options()
+        self.update_last_updated_label(event.sender.value)
 
     def account_selected(self, event: nicegui.events.ValueChangeEventArguments):
         selected_account_id = event.sender.value
@@ -75,34 +76,32 @@ class UIAccountSelect:
             ui.spinner(size='10em', color='black')
         loadingDialog.open()
         await asyncio.to_thread(get_and_process_account_info, self.organization_select.value)
-        self.update_last_updated_label()
+        self.update_last_updated_label(self.organization_select.value)
         self.update_account_select_options()
         loadingDialog.close()
 
-    def update_last_updated_label(self):
-        last_account_update = LastAccountUpdate.get_or_none(LastAccountUpdate.id == 0)
-        if last_account_update:
-            self.last_updated.set_text(
-                f"Account information last updated: {last_account_update.time.strftime('%d/%m/%y, %H:%M:%S')}.")
+    def update_last_updated_label(self, organization_id: str | None):
+        if not organization_id:
+            text = "None"
         else:
-            self.last_updated.set_text(f"Account information last updated: None")
+            last_account_update = LastAccountUpdate.get_or_create(organization=organization_id)[0]
+            if last_account_update:
+                text = last_account_update.time.strftime('%d/%m/%y, %H:%M:%S')
+            else:
+                text = "None"
+        self.last_updated.set_text(f"Account information last updated: {text}")
 
 
 def get_and_process_account_info(org_id: str):
 
+    organization = Organization.get_or_create(id=org_id)[0]
+
     account_info = aam.aws.get_organization_accounts(org_id)
-    account_info = [account for account in account_info if "SBSL" not in account["Name"]]
+    account_info = {account["Id"]: account for account in account_info if "SBSL" not in account["Name"]}
 
     if not account_info:
         ui.notify("No accounts found in organization. This is probably a permissions error.")
         return 0
-
-    # Get organization from ARN
-    organization_id = account_info[0]["Arn"].split("/")[1]
-    organization = Organization.get_or_create(id=organization_id)[0]
-
-    # Reorganize list into dict for convenient access
-    account_info = {account["Id"]: account for account in account_info}
 
     # Loop through all accounts in DB checking against data from AWS updating as necessary.
     db_accounts = {account.id: account for account in Account.select()}
@@ -120,4 +119,6 @@ def get_and_process_account_info(org_id: str):
         if account_id not in db_accounts:
             Account.create(id=account_details["Id"], name=account_details["Name"], email=account_details["Email"], status=account_details["Status"], organization=organization.id)
 
-    LastAccountUpdate.replace(id=0, time=datetime.datetime.now()).execute()
+    last_updated = LastAccountUpdate.get_or_create(organization=org_id)[0]
+    last_updated.time=datetime.datetime.now()
+    last_updated.save()
