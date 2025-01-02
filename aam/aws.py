@@ -1,20 +1,20 @@
-import os
-
 import boto3
+import nicegui.ui as ui
 
 from aam.config import CONFIG
 
 
-def get_accounts() -> list[dict]:
-    return get_organisation_accounts()
-
-
-def get_organisation_accounts(include_suspended: bool = True) -> list[dict]:
+def get_organization_accounts(org_id: str, include_suspended: bool = True) -> list[dict]:
     """Get a list of accounts in the organization."""
+
+    org_role_arns = CONFIG["organization_list_role_arns"]
+    if org_id not in org_role_arns:
+        ui.notify("Selected organization id not found in 'organization_list_role_arns' section in config.yaml")
+        return 0
 
     sts_connection = boto3.client('sts')
     acct_b = sts_connection.assume_role(
-        RoleArn=CONFIG["organization_list_role_arn"],
+        RoleArn=org_role_arns[org_id],
         RoleSessionName="aam_cross_acct_describe_org"
     )
 

@@ -3,7 +3,6 @@ import datetime
 from typing import TYPE_CHECKING
 
 import nicegui.events
-from docutils.nodes import organization
 from nicegui import ui
 
 import aam.aws
@@ -75,7 +74,7 @@ class UIAccountSelect:
         with ui.dialog() as loadingDialog:
             ui.spinner(size='10em', color='black')
         loadingDialog.open()
-        await asyncio.to_thread(get_and_process_account_info)
+        await asyncio.to_thread(get_and_process_account_info, self.organization_select.value)
         self.update_last_updated_label()
         self.update_account_select_options()
         loadingDialog.close()
@@ -89,9 +88,9 @@ class UIAccountSelect:
             self.last_updated.set_text(f"Account information last updated: None")
 
 
-def get_and_process_account_info():
+def get_and_process_account_info(org_id: str):
 
-    account_info = aam.aws.get_accounts()
+    account_info = aam.aws.get_organization_accounts(org_id)
     account_info = [account for account in account_info if "SBSL" not in account["Name"]]
 
     if not account_info:
