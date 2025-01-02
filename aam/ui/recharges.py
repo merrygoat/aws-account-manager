@@ -25,12 +25,11 @@ class UIRecharges:
                 "min-w-[400px]").props('popup-content-class="!max-h-[500px]"')
             self.add_request_button = ui.button("Add new request", on_click=self.new_request_dialog.open)
 
-        self.recharge_grid_title = ui.label("Recharges in recharge request: ")
         self.recharge_grid = ui.aggrid({
             'columnDefs': [{"headerName": "id", "field": "id", "hide": True},
                            {"headerName": "Account", "field": "account_name", "sort": "asc", "sortIndex": 0},
                            {"headerName": "Month", "field": "month_date", "sort": "asc", "sortIndex": 1},
-                           {"headerName": "Amount", "field": "recharge_amount"}],
+                           {"headerName": "Amount", "field": "recharge_amount", "valueFormatter": "value.toFixed(2)"}],
             'rowData': {},
             'rowSelection': 'multiple',
             'stopEditingWhenCellsLoseFocus': True,
@@ -80,7 +79,6 @@ class UIRecharges:
     def request_selected(self, event: nicegui.events.ValueChangeEventArguments):
         request_id = event.sender.value
         request = RechargeRequest.get(RechargeRequest.id == request_id)
-        self.recharge_grid_title.text = f"Recharges in recharge request: {request.reference}"
         self.update_recharge_grid()
 
     def get_request_options(self):
@@ -92,7 +90,7 @@ class UIRecharges:
 
     def update_recharge_grid(self):
         request_id = self.get_selected_recharge_request_id()
-        recharges = (Recharge.select(Recharge.id, Recharge.account, Month, Bill.usage, Account.name)
+        recharges = (Recharge.select(Recharge.id, Recharge.account, Month, Bill, Account.name)
                      .join(Month)
                      .join(Bill, on=((Month.id == Bill.month) & (Recharge.account == Bill.account_id)))
                      .join(Account)
@@ -100,7 +98,7 @@ class UIRecharges:
         recharges_list = []
         for recharge in recharges:
             recharges_list.append({"id": recharge.id, "account_name": f"{recharge.month.bill.account_id.name} - {recharge.account_id}",
-                                   "month_date": recharge.month.to_date(), "recharge_amount": recharge.month.bill.usage})
+                                   "month_date": recharge.month.to_date(), "recharge_amount": recharge.month.bill.total_pound()})
         self.recharge_grid.options["rowData"] = recharges_list
         self.recharge_grid.update()
 

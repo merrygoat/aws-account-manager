@@ -51,15 +51,16 @@ class Account(BaseModel):
 
         if self.creation_date:
             required_months = aam.utilities.get_months_between(self.creation_date, end)
-            required_bills = (Bill.select(Bill.id, Month.month_code, Bill.usage, Month.exchange_rate, Recharge.id, RechargeRequest.reference)
+            required_bills = (Bill.select(Bill.id, Month.month_code, Bill.usage, Bill.account_id, Month.id, Month.exchange_rate, Recharge.id, RechargeRequest.reference)
                               .join(Month)
                               .join(Recharge, JOIN.LEFT_OUTER, on=((Recharge.month == Month.id) & (Recharge.account == Bill.account_id)))
                               .join(RechargeRequest, JOIN.LEFT_OUTER)
                               .where((Month.month_code.in_(required_months)) & (Bill.account_id == self.id)))
 
             for bill in required_bills:
-                new_bill = {"id": bill.id, "month_code": bill.month.month_code, "month_date": bill.month.to_date(), "usage_dollar": bill.usage,
-                            "support_charge": bill.support_charge(), "total_pound": bill.total_pound()}
+                new_bill = {"id": bill.id, "month_code": bill.month.month_code, "month_date": bill.month.to_date(),
+                            "usage_dollar": bill.usage, "support_charge": bill.support_charge(),
+                            "shared_charges": bill.shared_charges(), "total_dollar": bill.total_dollar(), "total_pound": bill.total_pound()}
                 if hasattr(bill.month, "recharge"):
                     new_bill["recharge_reference"] = bill.month.recharge.recharge_request.reference
                 else:
@@ -136,12 +137,20 @@ class Bill(BaseModel):
         else:
             return Decimal(0)
 
+    def shared_charges(self) -> decimal.Decimal:
+        total = decimal.Decimal(0)
+        charges = (SharedCharge.select().where((AccountJoinSharedCharge.account_id == self.account_id.id) & (SharedCharge.month_id == self.month.id))
+                   .join(AccountJoinSharedCharge))
+        for charge in charges:
+            total += charge.cost_per_account()
+        return total
+
     def total_dollar(self) -> Decimal | None:
         """Calculate the total bill for the month."""
         if self.usage is None:
             return None
         else:
-            return self.usage + self.support_charge()
+            return self.usage + self.support_charge() + self.shared_charges()
 
     def total_pound(self) -> Decimal | None:
         """Calculate the total bill for the month."""
@@ -168,7 +177,7 @@ class Recharge(BaseModel):
 class SharedCharge(BaseModel):
     id = peewee.AutoField()
     name = peewee.TextField()
-    amount = peewee.DecimalField()
+    amount: decimal.Decimal = peewee.DecimalField()
     month_id = peewee.ForeignKeyField(Month, backref="shared_charges")
 
     def to_dict(self):
@@ -181,6 +190,12 @@ class SharedCharge(BaseModel):
 
         return {"id": self.id, "name": self.name, "amount": self.amount, "month": str(month),
                 "account_names": account_names}
+
+    def num_accounts(self) -> int:
+        return AccountJoinSharedCharge.select().where(AccountJoinSharedCharge.shared_charge_id == self.id).count()
+
+    def cost_per_account(self) -> decimal.Decimal:
+        return self.amount / self.num_accounts()
 
 class AccountJoinSharedCharge(BaseModel):
     id = peewee.AutoField()
