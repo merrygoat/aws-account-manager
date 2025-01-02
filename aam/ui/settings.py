@@ -52,14 +52,18 @@ class UIExchangeRate:
 class UIOrganizations:
     def __init__(self, parent: UISettings):
         self.parent = parent
+        self.new_org_dialog = UINewOrganizationDialog(self)
 
         self.organization_grid = ui.aggrid({
             "defaultColDef": {"sortable": False},
             'columnDefs': [{"headerName": "id", "field": "id"},
                            {"headerName": "Name", "field": "name", "editable": True}],
             'rowData': {},
+            'rowSelection': 'single',
             'stopEditingWhenCellsLoseFocus': True,
         })
+        self.add_new_org = ui.button("Add new organization", on_click=self.new_org_dialog.open)
+        self.delete_organization = ui.button("Delete selected organization", on_click=self.delete_organization)
         self.organization_grid.on("cellValueChanged", self.update_org_name)
         self.populate_org_grid()
 
@@ -74,3 +78,43 @@ class UIOrganizations:
         org = Organization.get(id=org_id)
         org.name = event.args["data"]["name"]
         org.save()
+
+    async def delete_organization(self, event: nicegui.events.ClickEventArguments):
+        selected_org = await(self.organization_grid.get_selected_row())
+        if selected_org:
+            organization = Organization.get(Organization.id == selected_org["id"])
+            if list(organization.accounts):
+                ui.notify("Cannot delete Organization as it has accounts associated with it.")
+            else:
+                organization.delete_instance()
+                ui.notify("Organization successfully deleted")
+                self.populate_org_grid()
+        else:
+            ui.notify("No organization selected to delete.")
+
+class UINewOrganizationDialog:
+    def __init__(self, parent: UIOrganizations):
+        self.parent = parent
+        with ui.dialog() as self.dialog:
+            with ui.card():
+                ui.label("New Organization").classes("text-2xl")
+                with ui.grid(columns="auto auto"):
+                    ui.label("Organization ID")
+                    self.name = ui.input(validation={"Must provide organization ID": lambda value: len(value) > 1})
+                    ui.button("Add", on_click=self.new_organization)
+                    ui.button("Cancel", on_click=self.dialog.close)
+
+    def open(self):
+        self.dialog.open()
+
+    def close(self):
+        self.dialog.close()
+
+    def new_organization(self, event: nicegui.events.ClickEventArguments):
+        if self.name.value != "":
+            Organization.create(id=self.name.value)
+            ui.notify("New organization added")
+            self.parent.populate_org_grid()
+            self.close()
+        else:
+            ui.notify("Must provide an organization name")
