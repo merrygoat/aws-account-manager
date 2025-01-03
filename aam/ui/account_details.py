@@ -79,11 +79,12 @@ class UIAccountDetails:
             selected_sysadmin = Person.get(Person.id == selected_sysadmin)
             Sysadmin.create(person=selected_sysadmin, account=account)
         else:
-            account.sysadmin = None
-        selected_budgetholder = self.budget_holder.value
-        if selected_budgetholder:
-            selected_budgetholder = Person.get(Person.id == selected_budgetholder)
-            account.budget_holder = selected_budgetholder
+            sysadmin = Sysadmin.get(Sysadmin.account == account.id)
+            sysadmin.delete_instance()
+        selected_budget_holder = self.budget_holder.value
+        if selected_budget_holder:
+            selected_budget_holder = Person.get(Person.id == selected_budget_holder)
+            account.budget_holder = selected_budget_holder
         else:
             account.budget_holder = None
         ui.notify("Record updated.")
@@ -155,7 +156,7 @@ class UIAccountDetails:
         else:
             self.budget_holder.set_value(None)
 
-        sysadmin = account.sysadmin.get_or_none()
+        sysadmin = Sysadmin.get_or_none(Sysadmin.account == account.id)
         if sysadmin:
             self.sysadmin.set_value(sysadmin.person.id)
         else:
