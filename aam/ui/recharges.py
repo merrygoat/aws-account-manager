@@ -24,6 +24,7 @@ class UIRecharges:
             self.request_select = ui.select(label="Recharge Request", options={}, on_change=self.request_selected).classes(
                 "min-w-[400px]").props('popup-content-class="!max-h-[500px]"')
             self.add_request_button = ui.button("Add new request", on_click=self.new_request_dialog.open)
+            self.delete_selected_request_button = ui.button("Delete selected request", on_click=self.delete_selected_request)
 
         self.recharge_grid = ui.aggrid({
             'columnDefs': [{"headerName": "id", "field": "id", "hide": True},
@@ -37,7 +38,7 @@ class UIRecharges:
 
         self.remove_recharge_button = ui.button("Remove selected items from request", on_click=self.remove_recharge_from_request)
         self.export_recharge_button = ui.button("Export selected request", on_click=self.export_recharge_request)
-        self.get_request_options()
+        self.populate_request_select()
 
     def export_recharge_request(self):
         request_id = self.get_selected_recharge_request_id()
@@ -79,7 +80,7 @@ class UIRecharges:
     def request_selected(self, event: nicegui.events.ValueChangeEventArguments):
         self.update_recharge_grid()
 
-    def get_request_options(self):
+    def populate_request_select(self):
         requests = {request.id: f"{request.date} - {request.reference}" for request in RechargeRequest.select()}
         self.request_select.set_options(requests)
 
@@ -99,6 +100,18 @@ class UIRecharges:
                                    "month_date": recharge.month.to_date(), "recharge_amount": recharge.month.bill.total_pound()})
         self.recharge_grid.options["rowData"] = recharges_list
         self.recharge_grid.update()
+
+    def delete_selected_request(self, event: nicegui.events.ClickEventArguments):
+        request_id = self.get_selected_recharge_request_id()
+        request: RechargeRequest = RechargeRequest.get(request_id)
+        if request.recharges:
+            ui.notify("Recharge request has recharges. These must be removed before deleting the request.")
+            return 0
+        else:
+            ui.notify(f"Request {request.reference} deleted.")
+            request.delete_instance()
+            self.populate_request_select()
+
 
 class UINewRechargeDialog:
     def __init__(self, parent: UIRecharges):
@@ -124,7 +137,7 @@ class UINewRechargeDialog:
         if self.reference_input.value != "":
             RechargeRequest.create(date=datetime.date.fromisoformat(self.date_input.value), reference=self.reference_input.value)
             ui.notify("New recharge request added")
-            self.parent.get_request_options()
+            self.parent.populate_request_select()
             self.close()
         else:
             ui.notify("Must provide a reference")
