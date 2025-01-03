@@ -143,6 +143,8 @@ class Bill(BaseModel):
             return Decimal(0)
 
     def shared_charges(self) -> decimal.Decimal:
+        if self.account_id.id is None or self.month.id is None:
+            raise ValueError("Calculation of shared charges failed due to missing data.")
         total = decimal.Decimal(0)
         charges = (SharedCharge.select().where((AccountJoinSharedCharge.account_id == self.account_id.id) & (SharedCharge.month_id == self.month.id))
                    .join(AccountJoinSharedCharge))

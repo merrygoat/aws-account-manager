@@ -29,7 +29,7 @@ class UIRecharges:
             'columnDefs': [{"headerName": "id", "field": "id", "hide": True},
                            {"headerName": "Account", "field": "account_name", "sort": "asc", "sortIndex": 0},
                            {"headerName": "Month", "field": "month_date", "sort": "asc", "sortIndex": 1},
-                           {"headerName": "Amount", "field": "recharge_amount", "valueFormatter": "value.toFixed(2)"}],
+                           {"headerName": "Amount (£)", "field": "recharge_amount", "valueFormatter": "value.toFixed(2)"}],
             'rowData': {},
             'rowSelection': 'multiple',
             'stopEditingWhenCellsLoseFocus': True,
@@ -45,7 +45,7 @@ class UIRecharges:
             ui.notify("No recharge request selected.")
             return 0
         recharge_request = RechargeRequest.get(RechargeRequest.id == request_id)
-        recharges = (Recharge.select(Recharge.id, Recharge.account, Month.exchange_rate, Bill.month, Bill.usage, Account.name, Account.finance_code, Account.task_code)
+        recharges = (Recharge.select(Recharge, Month, Bill, Account)
                      .join(Month)
                      .join(Bill, on=((Month.id == Bill.month) & (Recharge.account == Bill.account_id)))
                      .join(Account)
@@ -77,8 +77,6 @@ class UIRecharges:
         self.parent.bills.update_bill_grid()
 
     def request_selected(self, event: nicegui.events.ValueChangeEventArguments):
-        request_id = event.sender.value
-        request = RechargeRequest.get(RechargeRequest.id == request_id)
         self.update_recharge_grid()
 
     def get_request_options(self):
@@ -90,7 +88,7 @@ class UIRecharges:
 
     def update_recharge_grid(self):
         request_id = self.get_selected_recharge_request_id()
-        recharges = (Recharge.select(Recharge.id, Recharge.account, Month, Bill, Account.name)
+        recharges = (Recharge.select(Recharge, Month, Bill, Account)
                      .join(Month)
                      .join(Bill, on=((Month.id == Bill.month) & (Recharge.account == Bill.account_id)))
                      .join(Account)
