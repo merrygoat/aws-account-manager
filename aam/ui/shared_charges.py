@@ -25,7 +25,7 @@ class UISharedCharges:
                     'columnDefs': [{"headerName": "id", "field": "id", "hide": True},
                                    {"headerName": "Name", "field": "name"},
                                    {"headerName": "Month", "field": "month", 'sort': 'asc'},
-                                   {"headerName": "Amount", "field": "amount"},
+                                   {"headerName": "Amount ($)", "field": "amount"},
                                    {"headerName": "Accounts", "field": "account_names"}],
                     'rowData': {},
                     'rowSelection': "single",
@@ -157,6 +157,7 @@ class UISharedChargeDialog:
                 AccountJoinSharedCharge.create(account_id=account_id, shared_charge_id=shared_charge.id)
 
         self.parent.populate_shared_charges_table()
+        self.parent.parent.bills.update_bill_grid()
         if self.shared_charge_id:
             ui.notify("Shared charge edited.")
         else:

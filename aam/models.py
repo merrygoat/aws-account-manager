@@ -203,10 +203,13 @@ class SharedCharge(BaseModel):
     def cost_per_account(self) -> decimal.Decimal:
         return self.amount / self.num_accounts()
 
+
 class AccountJoinSharedCharge(BaseModel):
-    id = peewee.AutoField()
     account_id = peewee.ForeignKeyField(Account, backref="shared_charges_join")
     shared_charge_id = peewee.ForeignKeyField(SharedCharge, backref="account_join", on_delete="CASCADE")
+
+    class Meta:
+        primary_key = peewee.CompositeKey('account_id', 'shared_charge_id')
 
 
 db.create_tables([Account, LastAccountUpdate, Person, Sysadmin, Note, Month, Bill, Recharge, RechargeRequest,
