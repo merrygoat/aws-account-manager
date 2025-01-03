@@ -51,24 +51,30 @@ class UIPeople:
         ui.notify("Person details updated.")
 
     def populate_select(self):
-        people = Person.select()
-        people = {person.id: f"{person.first_name} {person.last_name}" for person in people}
+        people = {person.id: f"{person.first_name} {person.last_name}" for person in Person.select()}
         self.person_select.set_options(people)
         
     def show_person_details(self, event: nicegui.events.ValueChangeEventArguments):
         selected_person_id = event.sender.value
-        person: Person = Person.get(Person.id == selected_person_id)
-        self.first_name.value = person.first_name
-        self.last_name.value = person.last_name
-        self.email.value = person.email
-        roles = []
-        for sysadmin in person.sysadmin:
-            roles.append({"role": "Sysadmin", "account": sysadmin.account.name})
-        if hasattr(person, "budget_holder"):
-            for account in person.budget_holder:
-                roles.append({"role": "Budget Holder", "account": account.name})
-        self.roles_grid.options["rowData"] = roles
-        self.roles_grid.update()
+        if selected_person_id is None:
+            self.first_name.value = ""
+            self.last_name.value = ""
+            self.email.value = ""
+            self.roles_grid.options["rowData"] = {}
+            self.roles_grid.update()
+        else:
+            person: Person = Person.get(Person.id == selected_person_id)
+            self.first_name.value = person.first_name
+            self.last_name.value = person.last_name
+            self.email.value = person.email
+            roles = []
+            for sysadmin in person.sysadmin:
+                roles.append({"role": "Sysadmin", "account": sysadmin.account.name})
+            if hasattr(person, "budget_holder"):
+                for account in person.budget_holder:
+                    roles.append({"role": "Budget Holder", "account": account.name})
+            self.roles_grid.options["rowData"] = roles
+            self.roles_grid.update()
 
     def delete_person(self, event: nicegui.events.ClickEventArguments):
         selected_person_id = self.person_select.value
