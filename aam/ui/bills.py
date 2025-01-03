@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 import nicegui.events
 from nicegui import ui
 
-from aam.models import Account, Bill, Month, RechargeRequest, Recharge
+from aam.models import Account, Bill, Month, RechargeRequest
 from aam.utilities import get_months_between
 
 if TYPE_CHECKING:
@@ -48,7 +48,7 @@ class UIBills:
 
             if missing_months:
                 for month_code in missing_months:
-                    Bill.get_or_create(account_id=account.id, month_id=Month.get(month_code=month_code))
+                    Bill.get_or_create(account=account.id, month=Month.get(month_code=month_code))
                 bills = account.get_bills()
             self.bill_grid.options["rowData"] = bills
         else:
@@ -87,7 +87,9 @@ class UIBills:
         for bill in bills:
             if bill.usage is None:
                 ui.notify(f"Cannot add bill for month {str(bill.month)} as it has no recorded usage.")
+                return 0
             else:
-                Recharge.get_or_create(account_id=bill.account_id, month=bill.month.id, recharge_request=selected_recharge_request_id)
+                bill.recharge_request = selected_recharge_request_id
+                bill.save()
         self.update_bill_grid()
         self.parent.recharges.update_recharge_grid()

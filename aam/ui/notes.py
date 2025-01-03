@@ -53,7 +53,7 @@ class UIAccountNotes:
             self.clear()
             return 0
 
-        notes = [note for note in Note.select().where(Note.account_id == account.id)]
+        notes = [note for note in Note.select().where(Note.account == account.id)]
         if notes:
             notes = [{"id": note.id, "date": note.date, "text": note.text} for note in notes]
         else:
@@ -92,7 +92,7 @@ class AddNoteDialog:
     def save_new_note(self, event: nicegui.events.ClickEventArguments):
         date = self.date.value
         text = self.text.value
-        Note.create(date=date, text=text, account_id=self.selected_account.id)
+        Note.create(date=date, text=text, account=self.selected_account.id)
         self.close()
         self.parent.update_note_grid()
         ui.notify("New Note saved.")

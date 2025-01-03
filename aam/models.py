@@ -8,6 +8,7 @@ import calendar
 import datetime
 import decimal
 from decimal import Decimal
+from collections.abc import Iterable
 
 import peewee
 from peewee import JOIN
@@ -28,8 +29,8 @@ class Person(BaseModel):
     first_name = peewee.CharField()
     last_name = peewee.CharField()
     email = peewee.CharField()
-    budget_holder: "Account"  # backref
-    sysadmin: "Sysadmin"  # backref
+    budget_holder: Iterable["Account"]  # backref
+    sysadmin: Iterable["Sysadmin"]  # backref
 
     @property
     def full_name(self) -> str:
@@ -39,8 +40,8 @@ class Organization(BaseModel):
     id = peewee.CharField(primary_key=True)
     name = peewee.CharField(null=True)
     accounts: "Account"  # backref
-    last_updated_time: "LastAccountUpdate"  # backref
-    shared_charges: "SharedCharge"  # backref
+    last_updated_time: Iterable["LastAccountUpdate"]  # backref
+    shared_charges: Iterable["SharedCharge"]  # backref
 
 class Account(BaseModel):
     id = peewee.CharField(primary_key=True)
@@ -53,10 +54,9 @@ class Account(BaseModel):
     task_code = peewee.CharField(null=True)
     creation_date: datetime.date = peewee.DateField(null=True)
     closure_date: datetime.date = peewee.DateField(null=True)
-    sysadmin: "Sysadmin"  # backref
-    notes: "Note"  # backref
-    bills: "Bill"  # backref
-    recharges: "Recharge"  # backref
+    sysadmin: Iterable["Sysadmin"]  # backref
+    notes: Iterable["Note"]  # backref
+    bills: Iterable["Bill"]  # backref
 
     def get_bills(self) -> list[dict]:
         """Returns a list of dicts describing bills in the account between the creation date and the account closure
@@ -70,18 +70,17 @@ class Account(BaseModel):
 
         if self.creation_date:
             required_months = aam.utilities.get_months_between(self.creation_date, end)
-            required_bills = (Bill.select(Bill.id, Month.month_code, Bill.usage, Bill.account_id, Month.id, Month.exchange_rate, Recharge, RechargeRequest.reference)
-                              .join(Month)
-                              .join(Recharge, JOIN.LEFT_OUTER, on=((Recharge.month == Month.id) & (Recharge.account == Bill.account_id)))
-                              .join(RechargeRequest, JOIN.LEFT_OUTER)
-                              .where((Month.month_code.in_(required_months)) & (Bill.account_id == self.id)))
+            required_bills = (Bill.select(Bill.id, Month.month_code, Bill.usage, Bill.account, Month.id, Month.exchange_rate, RechargeRequest.reference)
+                              .join_from(Bill, Month)
+                              .join_from(Bill, RechargeRequest, JOIN.LEFT_OUTER)
+                              .where((Month.month_code.in_(required_months)) & (Bill.account == self.id)))
 
             for bill in required_bills:
                 new_bill = {"id": bill.id, "month_code": bill.month.month_code, "month_date": bill.month.to_date(),
                             "usage_dollar": bill.usage, "support_charge": bill.support_charge(),
                             "shared_charges": bill.shared_charges(), "total_dollar": bill.total_dollar(), "total_pound": bill.total_pound()}
-                if hasattr(bill.month, "recharge"):
-                    new_bill["recharge_reference"] = bill.month.recharge.recharge_request.reference
+                if bill.recharge_request:
+                    new_bill["recharge_reference"] = bill.recharge_request.reference
                 else:
                     new_bill["recharge_reference"] = "-"
                 bills.append(new_bill)
@@ -111,15 +110,14 @@ class Note(BaseModel):
     id = peewee.AutoField()
     date = peewee.DateField()
     text = peewee.CharField()
-    account_id = peewee.ForeignKeyField(Account, backref="notes")
+    account = peewee.ForeignKeyField(Account, backref="notes")
 
 class Month(BaseModel):
     id = peewee.AutoField()
     month_code: int = peewee.IntegerField()
     exchange_rate = peewee.DecimalField()
-    bills: "Bill"  # backref
-    recharges: "Recharge"  # backref
-    shared_charges: "SharedCharge"  # backref
+    bills: Iterable["Bill"]  # backref
+    shared_charges: Iterable["SharedCharge"]  # backref
 
     @property
     def year(self) -> int:
@@ -142,11 +140,20 @@ class Month(BaseModel):
     def to_date(self):
         return datetime.date(self.year, self.month, 1)
 
+
+class RechargeRequest(BaseModel):
+    id = peewee.AutoField()
+    date: datetime.date = peewee.DateField()
+    reference = peewee.CharField()
+    bill: Iterable["Bill"]  # backref
+
+
 class Bill(BaseModel):
     id = peewee.AutoField()
-    account_id = peewee.ForeignKeyField(Account, backref="bills")
+    account = peewee.ForeignKeyField(Account, backref="bills")
     month = peewee.ForeignKeyField(Month, backref="bills")
     usage: decimal.Decimal = peewee.DecimalField(null=True)
+    recharge_request = peewee.ForeignKeyField(RechargeRequest, backref="bill", null=True)
 
     def support_eligible(self):
         """Accounts must pay 10% charge after 01/08/24 as this was when the OGVA started."""
@@ -161,10 +168,10 @@ class Bill(BaseModel):
             return Decimal(0)
 
     def shared_charges(self) -> decimal.Decimal:
-        if self.account_id.id is None or self.month.id is None:
+        if self.account.id is None or self.month.id is None:
             raise ValueError("Calculation of shared charges failed due to missing data.")
         total = decimal.Decimal(0)
-        charges = (SharedCharge.select().where((AccountJoinSharedCharge.account_id == self.account_id.id) & (SharedCharge.month_id == self.month.id))
+        charges = (SharedCharge.select().where((AccountJoinSharedCharge.account == self.account.id) & (SharedCharge.month == self.month.id))
                    .join(AccountJoinSharedCharge))
         for charge in charges:
             total += charge.cost_per_account()
@@ -186,29 +193,15 @@ class Bill(BaseModel):
             return  self.total_dollar() * self.month.exchange_rate
 
 
-class RechargeRequest(BaseModel):
-    id = peewee.AutoField()
-    date: datetime.date = peewee.DateField()
-    reference = peewee.CharField()
-    recharges: "Recharge"  # backref
-
-
-class Recharge(BaseModel):
-    id = peewee.AutoField()
-    account = peewee.ForeignKeyField(Account, backref="recharges")
-    month = peewee.ForeignKeyField(Month, backref="recharges")
-    recharge_request = peewee.ForeignKeyField(RechargeRequest, backref="recharges")
-
-
 class SharedCharge(BaseModel):
     id = peewee.AutoField()
     name = peewee.TextField()
     amount: decimal.Decimal = peewee.DecimalField()
     organization = peewee.ForeignKeyField(Organization, backref="shared_charges")
-    month_id = peewee.ForeignKeyField(Month, backref="shared_charges")
+    month = peewee.ForeignKeyField(Month, backref="shared_charges")
 
     def to_dict(self):
-        month = Month.get(Month.id == self.month_id)
+        month = Month.get(Month.id == self.month)
         charges = (SharedCharge.select(Account.name).where(SharedCharge.id == self.id)
                    .join(AccountJoinSharedCharge)
                    .join(Account).dicts())
@@ -219,19 +212,19 @@ class SharedCharge(BaseModel):
                 "account_names": account_names}
 
     def num_accounts(self) -> int:
-        return AccountJoinSharedCharge.select().where(AccountJoinSharedCharge.shared_charge_id == self.id).count()
+        return AccountJoinSharedCharge.select().where(AccountJoinSharedCharge.shared_charge == self.id).count()
 
     def cost_per_account(self) -> decimal.Decimal:
         return self.amount / self.num_accounts()
 
 
 class AccountJoinSharedCharge(BaseModel):
-    account_id = peewee.ForeignKeyField(Account, backref="shared_charges_join")
-    shared_charge_id = peewee.ForeignKeyField(SharedCharge, backref="account_join", on_delete="CASCADE")
+    account = peewee.ForeignKeyField(Account, backref="shared_charges_join")
+    shared_charge = peewee.ForeignKeyField(SharedCharge, backref="account_join", on_delete="CASCADE")
 
     class Meta:
-        primary_key = peewee.CompositeKey('account_id', 'shared_charge_id')
+        primary_key = peewee.CompositeKey('account', 'shared_charge')
 
 
-db.create_tables([Account, LastAccountUpdate, Person, Sysadmin, Note, Month, Bill, Recharge, RechargeRequest,
+db.create_tables([Account, LastAccountUpdate, Person, Sysadmin, Note, Month, Bill, RechargeRequest,
                   SharedCharge, AccountJoinSharedCharge, Organization])

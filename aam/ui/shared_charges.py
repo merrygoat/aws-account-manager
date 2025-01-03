@@ -139,22 +139,22 @@ class UISharedChargeDialog:
 
             # Add any newly selected accounts
             for account_id in ids_to_add:
-                AccountJoinSharedCharge.create(account_id=account_id, shared_charge_id=shared_charge.id)
+                AccountJoinSharedCharge.create(account=account_id, shared_charge=shared_charge.id)
 
             # Delete any accounts no longer selected
             (AccountJoinSharedCharge.delete()
-             .where((AccountJoinSharedCharge.account_id.in_(ids_to_delete)) & (AccountJoinSharedCharge.shared_charge_id == shared_charge.id))
+             .where((AccountJoinSharedCharge.account.in_(ids_to_delete)) & (AccountJoinSharedCharge.shared_charge == shared_charge.id))
              .execute())
 
             shared_charge.name = self.name.value
             shared_charge.amount = amount
-            shared_charge.month_id = month.id
+            shared_charge.month = month.id
             shared_charge.save()
         else:
-            shared_charge = SharedCharge.create(name=self.name.value, amount=amount, month_id=month.id,
+            shared_charge = SharedCharge.create(name=self.name.value, amount=amount, month=month.id,
                                                 organization=self.parent.parent.get_selected_organization_id())
             for account_id in self.account_select.value:
-                AccountJoinSharedCharge.create(account_id=account_id, shared_charge_id=shared_charge.id)
+                AccountJoinSharedCharge.create(account=account_id, shared_charge=shared_charge.id)
 
         self.parent.populate_shared_charges_table()
         self.parent.parent.bills.update_bill_grid()
@@ -169,7 +169,7 @@ class UISharedChargeDialog:
 
         if shared_charge:
             self.shared_charge_id = shared_charge.id
-            month = Month.get(Month.id == shared_charge.month_id)
+            month = Month.get(Month.id == shared_charge.month)
             accounts = (Account.select(Account.id).where(SharedCharge.id == shared_charge.id)
                            .join(AccountJoinSharedCharge)
                            .join(SharedCharge).dicts())

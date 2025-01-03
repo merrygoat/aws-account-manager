@@ -6,7 +6,7 @@ from nicegui import ui
 import nicegui.events
 
 from aam import utilities
-from aam.models import RechargeRequest, Month, Recharge, Bill, Account, Person
+from aam.models import RechargeRequest, Month, Bill, Account, Person
 
 if TYPE_CHECKING:
     from aam.main import UIMainForm
@@ -27,7 +27,7 @@ class UIRecharges:
             self.delete_selected_request_button = ui.button("Delete selected request", on_click=self.delete_selected_request)
 
         self.recharge_grid = ui.aggrid({
-            'columnDefs': [{"headerName": "id", "field": "id", "hide": True},
+            'columnDefs': [{"headerName": "bill_id", "field": "bill_id", "hide": True},
                            {"headerName": "Account", "field": "account_name", "sort": "asc", "sortIndex": 0},
                            {"headerName": "Month", "field": "month_date", "sort": "asc", "sortIndex": 1},
                            {"headerName": "Amount (£)", "field": "recharge_amount", "valueFormatter": "value.toFixed(2)"}],
@@ -36,7 +36,7 @@ class UIRecharges:
             'stopEditingWhenCellsLoseFocus': True,
         })
 
-        self.remove_recharge_button = ui.button("Remove selected items from request", on_click=self.remove_recharge_from_request)
+        self.remove_recharge_button = ui.button("Remove selected items from request", on_click=self.remove_recharge_from_bill)
         self.export_recharge_button = ui.button("Export selected request", on_click=self.export_recharge_request)
         self.populate_request_select()
 
@@ -45,35 +45,42 @@ class UIRecharges:
         if not request_id:
             ui.notify("No recharge request selected.")
             return 0
-        recharge_request = RechargeRequest.get(RechargeRequest.id == request_id)
-        recharges = (Recharge.select(Recharge, Month, Bill, Account)
-                     .join(Month)
-                     .join(Bill, on=((Month.id == Bill.month) & (Recharge.account == Bill.account_id)))
-                     .join(Account)
-                     .join(Person)
-                     .where(Recharge.recharge_request == request_id))
+        bills = (Bill.select(Bill, Account, Person)
+                 .join(Account)
+                 .join(Person)
+                 .where(Bill.recharge_request == request_id))
+        if not bills:
+            ui.notify("Cannot export recharge request as it has no recharges.")
+            return 0
 
-        recharge_dict = {}
-        for recharge in recharges:
-            if recharge.account.id not in recharge_dict:
-                recharge_dict[recharge.account.id] = []
-            recharge_dict[recharge.account.id].append(recharge)
+        # Group bills by account
+        bill_dict = {}
+        for bill in bills:
+            if bill.account.id not in bill_dict:
+                bill_dict[bill.account.id] = []
+            bill_dict[bill.account.id].append(bill)
 
         export_string = "Account Number, Account Name, Budget Holder Name, Budget Holder Email, CC email, Finance Code, Task Code, Total\n"
-        for account_number, recharges in recharge_dict.items():
+        for account_number, bills in bill_dict.items():
             total = Decimal(0)
-            for recharge in recharges:
-                total += recharge.month.bill.total_pound()
+            for bill in bills:
+                total += bill.total_pound()
             total = round(total, 2)
-            account = recharges[0].account
+            account = bills[0].account
             export_string += f"{account_number}, {account.name}, {account.budget_holder.first_name}, {account.budget_holder.email}, , {account.finance_code}, {account.task_code}, {total}\n"
+
+        recharge_request = RechargeRequest.get(id=request_id)
         ui.download(bytes(export_string, 'utf-8'), f"{recharge_request.reference} export.txt")
 
-    async def remove_recharge_from_request(self):
+    async def remove_recharge_from_bill(self):
         selected_rows = await(self.recharge_grid.get_selected_rows())
-        selected_recharges = [row["id"] for row in selected_rows]
-        delete_query = Recharge.delete().where(Recharge.id.in_(selected_recharges))
-        delete_query.execute()
+        selected_bills = [row["bill_id"] for row in selected_rows]
+
+        bills = Bill.select().where(Bill.id.in_(selected_bills))
+        for bill in bills:
+            bill.recharge_request = None
+            bill.save()
+
         self.update_recharge_grid()
         self.parent.bills.update_bill_grid()
 
@@ -89,22 +96,21 @@ class UIRecharges:
 
     def update_recharge_grid(self):
         request_id = self.get_selected_recharge_request_id()
-        recharges = (Recharge.select(Recharge, Month, Bill, Account)
-                     .join(Month)
-                     .join(Bill, on=((Month.id == Bill.month) & (Recharge.account == Bill.account_id)))
-                     .join(Account)
-                     .where(Recharge.recharge_request == request_id))
+        bills = (Bill.select(Bill, Account, Month)
+                     .join_from(Bill, Account)
+                     .join_from(Bill, Month)
+                     .where(Bill.recharge_request == request_id))
         recharges_list = []
-        for recharge in recharges:
-            recharges_list.append({"id": recharge.id, "account_name": f"{recharge.month.bill.account_id.name} - {recharge.account_id}",
-                                   "month_date": recharge.month.to_date(), "recharge_amount": recharge.month.bill.total_pound()})
+        for bill in bills:
+            recharges_list.append({"bill_id": bill.id, "account_name": f"{bill.account.name} - {bill.account}",
+                                   "month_date": bill.month.to_date(), "recharge_amount": bill.total_pound()})
         self.recharge_grid.options["rowData"] = recharges_list
         self.recharge_grid.update()
 
     def delete_selected_request(self, event: nicegui.events.ClickEventArguments):
         request_id = self.get_selected_recharge_request_id()
         request: RechargeRequest = RechargeRequest.get(request_id)
-        if request.recharges:
+        if request.bill:
             ui.notify("Recharge request has recharges. These must be removed before deleting the request.")
             return 0
         else:
