@@ -36,29 +36,37 @@ class UISharedCharges:
                 with ui.row():
                     self.new_charge_button = ui.button("New Shared Charge", on_click=self.add_new_shared_charge)
                     self.edit_selected_button = ui.button("Edit Selected Shared Charge", on_click=self.edit_selected)
+                    self.duplicate_selected_button = ui.button("Duplicate Selected Shared Charge", on_click=self.duplicate_selected)
                     self.delete_selected_button = ui.button("Delete Selected Shared Charge", on_click=self.delete_selected)
 
         self.populate_shared_charges_table()
 
+    def add_new_shared_charge(self, event: nicegui.events.ClickEventArguments):
+        self.shared_charge_dialog.header.set_text("Add New Shared Charge")
+        self.shared_charge_dialog.open(mode="new")
+
     async def edit_selected(self, event: nicegui.events.ClickEventArguments):
         selected_row = await self.shared_charges_table.get_selected_row()
         if selected_row is None:
-            ui.notify("No shared charge selected.")
-            return 0
+            ui.notify("No shared charge selected to edit.")
         else:
             shared_charge = SharedCharge.get(SharedCharge.id==selected_row["id"])
-            self.shared_charge_dialog.header = "Editing existing Shared Charge"
-            self.shared_charge_dialog.open(shared_charge)
+            self.shared_charge_dialog.header.set_text("Editing existing Shared Charge")
+            self.shared_charge_dialog.open(shared_charge, mode="edit")
 
-    def add_new_shared_charge(self, event: nicegui.events.ClickEventArguments):
-        self.shared_charge_dialog.header = "Add New Shared Charge"
-        self.shared_charge_dialog.open()
+    async def duplicate_selected(self, event: nicegui.events.ClickEventArguments):
+        selected_row = await self.shared_charges_table.get_selected_row()
+        if selected_row is None:
+            ui.notify("No shared charge selected to duplicate.")
+        else:
+            shared_charge = SharedCharge.get(SharedCharge.id == selected_row["id"])
+            self.shared_charge_dialog.header.set_text("Add New Shared Charge")
+            self.shared_charge_dialog.open(shared_charge, mode="duplicate")
 
     async def delete_selected(self, event: nicegui.events.ClickEventArguments):
         selected_row = await self.shared_charges_table.get_selected_row()
         if selected_row is None:
             ui.notify("No shared charge selected.")
-            return 0
         else:
             shared_charge = SharedCharge.get(SharedCharge.id==selected_row["id"])
             shared_charge.delete_instance()
@@ -80,7 +88,7 @@ class UISharedChargeDialog:
 
         with ui.dialog() as self.dialog:
             with ui.card():
-                self.header = ui.html("").classes("text-2xl")
+                self.header = ui.label("").classes("text-2xl")
                 with ui.grid(columns="auto auto"):
                     ui.label("Name")
                     self.name = ui.input()
@@ -164,11 +172,15 @@ class UISharedChargeDialog:
             ui.notify("New shared charge added.")
         self.close()
 
-    def open(self, shared_charge: SharedCharge | None = None):
+    def open(self, shared_charge: SharedCharge | None = None, mode: str = "new"):
+        # Possible modes are "new", "edit" or "duplicate"
+
         self.update_account_select()
 
-        if shared_charge:
+        if mode == "edit":
             self.shared_charge_id = shared_charge.id
+
+        if mode != "new":
             month = Month.get(Month.id == shared_charge.month)
             accounts = (Account.select(Account.id).where(SharedCharge.id == shared_charge.id)
                            .join(AccountJoinSharedCharge)
