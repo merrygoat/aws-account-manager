@@ -38,9 +38,7 @@ class UIBills:
 
     def initialize(self, account: Account | None):
         """This function is run when an account is selected from the dropdown menu."""
-        if account is None:
-            return 0
-        if account.creation_date:
+        if account is not None and account.creation_date:
             bills = account.get_bills()
             required_bill_months = get_months_between(account.creation_date, account.final_date())
             actual_bill_months = [bill["month_code"] for bill in bills]

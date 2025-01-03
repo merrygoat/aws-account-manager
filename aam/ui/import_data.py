@@ -21,7 +21,7 @@ class UIImport:
         self.import_type = ui.select({1: "Billing Data", 2:"Exchange Rate"}, label="Import Type", value=1,
                                      on_change=self.import_type_selected)
         self.description = ui.label("")
-        with ui.grid(columns="auto auto auto").classes("place-items-center gap-1") as self.date_pick_grid:
+        with ui.grid(columns="auto auto").classes("place-items-center gap-1") as self.date_pick_grid:
             ui.label("Month")
             ui.label("Year")
             self.month = month_select()
