@@ -1,3 +1,9 @@
+# This is where the databases tables and fields are defined.
+
+# Where a foreign key is exposed on the parent object as a backref, I have added an annotated class object on the
+# parent. This is not technically necessary but helps the IDE, as otherwise it marks backrefs as unknown when they are
+# referenced.
+
 import calendar
 import datetime
 import decimal
@@ -22,6 +28,8 @@ class Person(BaseModel):
     first_name = peewee.CharField()
     last_name = peewee.CharField()
     email = peewee.CharField()
+    budget_holder: "Account"  # backref
+    sysadmin: "Sysadmin"  # backref
 
     @property
     def full_name(self) -> str:
@@ -30,6 +38,9 @@ class Person(BaseModel):
 class Organization(BaseModel):
     id = peewee.CharField(primary_key=True)
     name = peewee.CharField(null=True)
+    accounts: "Account"  # backref
+    last_updated_time: "LastAccountUpdate"  # backref
+    shared_charges: "SharedCharge"  # backref
 
 class Account(BaseModel):
     id = peewee.CharField(primary_key=True)
@@ -42,6 +53,10 @@ class Account(BaseModel):
     task_code = peewee.CharField(null=True)
     creation_date: datetime.date = peewee.DateField(null=True)
     closure_date: datetime.date = peewee.DateField(null=True)
+    sysadmin: "Sysadmin"  # backref
+    notes: "Note"  # backref
+    bills: "Bill"  # backref
+    recharges: "Recharge"  # backref
 
     def get_bills(self) -> list[dict]:
         """Returns a list of dicts describing bills in the account between the creation date and the account closure
@@ -55,7 +70,7 @@ class Account(BaseModel):
 
         if self.creation_date:
             required_months = aam.utilities.get_months_between(self.creation_date, end)
-            required_bills = (Bill.select(Bill.id, Month.month_code, Bill.usage, Bill.account_id, Month.id, Month.exchange_rate, Recharge.id, RechargeRequest.reference)
+            required_bills = (Bill.select(Bill.id, Month.month_code, Bill.usage, Bill.account_id, Month.id, Month.exchange_rate, Recharge, RechargeRequest.reference)
                               .join(Month)
                               .join(Recharge, JOIN.LEFT_OUTER, on=((Recharge.month == Month.id) & (Recharge.account == Bill.account_id)))
                               .join(RechargeRequest, JOIN.LEFT_OUTER)
@@ -102,6 +117,9 @@ class Month(BaseModel):
     id = peewee.AutoField()
     month_code: int = peewee.IntegerField()
     exchange_rate = peewee.DecimalField()
+    bills: "Bill"  # backref
+    recharges: "Recharge"  # backref
+    shared_charges: "SharedCharge"  # backref
 
     @property
     def year(self) -> int:
@@ -172,6 +190,7 @@ class RechargeRequest(BaseModel):
     id = peewee.AutoField()
     date: datetime.date = peewee.DateField()
     reference = peewee.CharField()
+    recharges: "Recharge"  # backref
 
 
 class Recharge(BaseModel):
