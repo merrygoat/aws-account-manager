@@ -2,7 +2,6 @@ from typing import TYPE_CHECKING
 
 from nicegui import ui
 import nicegui.events
-from watchfiles.run import raise_keyboard_interrupt
 
 from aam.models import Person
 
@@ -41,7 +40,7 @@ class UIPeople:
 
         self.populate_select()
 
-    def save_changes(self, event: nicegui.events.ClickEventArguments):
+    def save_changes(self):
         selected_person_id = self.person_select.value
         selected_person: Person = Person.get(id=selected_person_id)
         selected_person.first_name = self.first_name.value
@@ -76,7 +75,7 @@ class UIPeople:
             self.roles_grid.options["rowData"] = roles
             self.roles_grid.update()
 
-    def delete_person(self, event: nicegui.events.ClickEventArguments):
+    def delete_person(self):
         selected_person_id = self.person_select.value
         selected_person: Person = Person.get(id=selected_person_id)
         if selected_person.sysadmin or selected_person.budget_holder:

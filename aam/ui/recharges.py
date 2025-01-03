@@ -18,27 +18,66 @@ class UIRecharges:
 
         self.new_request_dialog = UINewRechargeDialog(self)
 
-        ui.label("Recharges").classes("text-4xl")
+        ui.label("Recharge Requests").classes("text-4xl")
+        with ui.row().classes('w-full'):
+            self.request_select = ui.select(label="Recharge Request", options={}, on_change=self.request_selected).classes("min-w-[400px]").props('popup-content-class="!max-h-[500px]"')
+            with ui.column():
+                self.add_request_button = ui.button("Add new request", on_click=self.new_request_dialog.open)
+                self.delete_selected_request_button = ui.button("Delete selected request", on_click=self.delete_selected_request)
 
-        with ui.row():
-            self.request_select = ui.select(label="Recharge Request", options={}, on_change=self.request_selected).classes(
-                "min-w-[400px]").props('popup-content-class="!max-h-[500px]"')
-            self.add_request_button = ui.button("Add new request", on_click=self.new_request_dialog.open)
-            self.delete_selected_request_button = ui.button("Delete selected request", on_click=self.delete_selected_request)
+        ui.label("Request items").classes("text-4xl")
+        with ui.row().classes('w-full'):
+            with ui.column().classes("w-1/2"):
+                self.recharge_grid = ui.aggrid({
+                    'columnDefs': [{"headerName": "bill_id", "field": "bill_id", "hide": True},
+                                   {"headerName": "Account", "field": "account_name", "sort": "asc", "sortIndex": 0},
+                                   {"headerName": "Month", "field": "month_date", "sort": "asc", "sortIndex": 1},
+                                   {"headerName": "Amount (£)", "field": "recharge_amount", "valueFormatter": "value.toFixed(2)"}],
+                    'rowData': {},
+                    'rowSelection': 'multiple',
+                    'stopEditingWhenCellsLoseFocus': True,
+                })
 
-        self.recharge_grid = ui.aggrid({
-            'columnDefs': [{"headerName": "bill_id", "field": "bill_id", "hide": True},
-                           {"headerName": "Account", "field": "account_name", "sort": "asc", "sortIndex": 0},
-                           {"headerName": "Month", "field": "month_date", "sort": "asc", "sortIndex": 1},
-                           {"headerName": "Amount (£)", "field": "recharge_amount", "valueFormatter": "value.toFixed(2)"}],
-            'rowData': {},
-            'rowSelection': 'multiple',
-            'stopEditingWhenCellsLoseFocus': True,
-        })
+            with ui.column():
+                self.add_to_recharge_request_button = ui.button("Add selected bills to request", on_click=self.add_recharges)
+                self.remove_recharge_button = ui.button("Remove selected items from request", on_click=self.remove_recharge_from_bill)
+                self.export_recharge_button = ui.button("Export selected request", on_click=self.export_recharge_request)
 
-        self.remove_recharge_button = ui.button("Remove selected items from request", on_click=self.remove_recharge_from_bill)
-        self.export_recharge_button = ui.button("Export selected request", on_click=self.export_recharge_request)
         self.populate_request_select()
+
+    async def add_recharges(self, event: nicegui.events.ClickEventArguments):
+        selected_recharge_request_id = self.get_selected_recharge_request_id()
+        if not selected_recharge_request_id:
+            ui.notify("No recharge request selected")
+            return 0
+
+        selected_rows = await(self.parent.bills.get_selected_rows())
+        if not selected_rows:
+            ui.notify("No bills selected")
+            return 0
+
+        bill_ids = [row["id"] for row in selected_rows]
+        bills = Bill.select().where(Bill.id.in_(bill_ids))
+        for bill in bills:
+            if bill.usage is None:
+                ui.notify(f"Cannot add bill for month {str(bill.month)} as it has no recorded usage.")
+            else:
+                bill.recharge_request = selected_recharge_request_id
+                bill.save()
+        self.parent.bills.update_bill_grid()
+        self.update_recharge_grid()
+
+    async def remove_recharge_from_bill(self):
+        selected_rows = await(self.recharge_grid.get_selected_rows())
+        selected_bills = [row["bill_id"] for row in selected_rows]
+
+        bills = Bill.select().where(Bill.id.in_(selected_bills))
+        for bill in bills:
+            bill.recharge_request = None
+            bill.save()
+
+        self.update_recharge_grid()
+        self.parent.bills.update_bill_grid()
 
     def export_recharge_request(self):
         request_id = self.get_selected_recharge_request_id()
@@ -71,18 +110,6 @@ class UIRecharges:
 
         recharge_request = RechargeRequest.get(id=request_id)
         ui.download(bytes(export_string, 'utf-8'), f"{recharge_request.reference} export.txt")
-
-    async def remove_recharge_from_bill(self):
-        selected_rows = await(self.recharge_grid.get_selected_rows())
-        selected_bills = [row["bill_id"] for row in selected_rows]
-
-        bills = Bill.select().where(Bill.id.in_(selected_bills))
-        for bill in bills:
-            bill.recharge_request = None
-            bill.save()
-
-        self.update_recharge_grid()
-        self.parent.bills.update_bill_grid()
 
     def request_selected(self, event: nicegui.events.ValueChangeEventArguments):
         self.update_recharge_grid()

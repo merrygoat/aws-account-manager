@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 class UIBills:
     def __init__(self, parent: "UIMainForm"):
         self.parent = parent
-        ui.html("Money").classes("text-2xl")
+        ui.label("Account Bills").classes("text-4xl")
         self.bill_grid = ui.aggrid({
             'defaultColDef': {"suppressMovable": True},
             'columnDefs': [{"headerName": "id", "field": "id", "hide": True},
@@ -34,7 +34,6 @@ class UIBills:
             'stopEditingWhenCellsLoseFocus': True,
         })
         self.bill_grid.on("cellValueChanged", self.update_bill)
-        self.add_to_recharge_request_button = ui.button("Add selected bills to selected recharge request", on_click=self.add_recharges)
 
     def initialize(self, account: Account | None):
         """This function is run when an account is selected from the dropdown menu."""
@@ -69,25 +68,5 @@ class UIBills:
         bill.save()
         self.update_bill_grid()
 
-    async def add_recharges(self, event: nicegui.events.ClickEventArguments):
-        selected_recharge_request_id: RechargeRequest = self.parent.recharges.get_selected_recharge_request_id()
-        if not selected_recharge_request_id:
-            ui.notify("No recharge request selected")
-            return 0
-
-        selected_rows = await(self.bill_grid.get_selected_rows())
-        if not selected_rows:
-            ui.notify("No bills selected")
-            return 0
-
-        bill_ids = [row["id"] for row in selected_rows]
-        bills = Bill.select().where(Bill.id.in_(bill_ids))
-        for bill in bills:
-            if bill.usage is None:
-                ui.notify(f"Cannot add bill for month {str(bill.month)} as it has no recorded usage.")
-                return 0
-            else:
-                bill.recharge_request = selected_recharge_request_id
-                bill.save()
-        self.update_bill_grid()
-        self.parent.recharges.update_recharge_grid()
+    async def get_selected_rows(self) -> list[dict]:
+        return await(self.bill_grid.get_selected_rows())
