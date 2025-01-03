@@ -1,6 +1,7 @@
 import datetime
 import decimal
 from typing import TYPE_CHECKING
+import re
 
 import nicegui.events
 from nicegui import ui
@@ -20,9 +21,9 @@ class UIImport:
         self.import_type = ui.select({1: "Billing Data", 2:"Exchange Rate"}, label="Import Type", value=1,
                                      on_change=self.import_type_selected)
         self.description = ui.label("")
-        with ui.grid(columns="auto auto").classes("place-items-center gap-1") as self.date_pick_grid:
-            self.label = ui.label("Month")
-            self.label = ui.label("Year")
+        with ui.grid(columns="auto auto auto").classes("place-items-center gap-1") as self.date_pick_grid:
+            ui.label("Month")
+            ui.label("Year")
             self.month = month_select()
             self.year = year_select()
         self.import_textbox = ui.textarea("Raw data").classes("w-1/2")
@@ -83,35 +84,40 @@ class UIImport:
 
         valid_account_numbers = [account.id for account in Account.select(Account.id)]
 
+        processed_lines = []
+
         # Check data validity
         for index, line in enumerate(data):
             # Remove all spaces
             line = line.replace(" ", "")
+            # If the line is blank then skip it
+            if line == "":
+                continue
             # Remove dollar signs
             line = line.replace("$", "")
             # No usage can be represented by a dash
             line = line.replace("-", "0")
-            # Replace the field separator comma with a rarely used character
-            line = line.replace(",", "@", 1)
             # Remove any thousand or million separators in usage amount
-            line = line.replace(",", "")
+            line = re.sub(",(?=\d{3})", "", line)
+            # Any other commas are now delimiters so replace them with tabs
+            line = line.replace(",", "\t")
             # Split the line by field seperator
-            line = line.split("@")
-            data[index] = line
-            if len(line) != 2:
-                ui.notify(f"Malformed data on line {index}.")
+            line = line.split("\t")
+            if len(line) not in [2, 3]:
+                ui.notify(f"Malformed data on line {index} - wrong number of fields.")
                 return 0
             if len(line[0]) != 12:
-                ui.notify(f"Malformed account number on line {index}")
+                ui.notify(f"Malformed account number on line {index} - must be 12 characters")
                 return 0
             if line[0] not in valid_account_numbers:
                 ui.notify(f"Account number {line[0]} at line {index} not found in database.")
                 return 0
             try:
-                decimal.Decimal(line[1])
+                decimal.Decimal(line[-1])
             except decimal.InvalidOperation:
-                ui.notify(f"Malformed bill amount on line {index}")
+                ui.notify(f"Malformed bill amount on line {index} - unable to convert to Decimal")
                 return 0
+            processed_lines.append(line)
         ui.notify("Data is valid.")
 
         month = self.month.value
@@ -119,9 +125,9 @@ class UIImport:
         month_code = aam.utilities.month_code(year, month)
         month = Month.get(month_code=month_code)
 
-        for line in data:
+        for line in processed_lines:
             bill = Bill.get_or_create(account=line[0], month=month.id)[0]
-            bill.usage = decimal.Decimal(line[1])
+            bill.usage = decimal.Decimal(line[-1])
             bill.save()
         self.parent.bills.update_bill_grid()
         ui.notify("Bills added to accounts.")
