@@ -165,7 +165,7 @@ class UISharedChargeDialog:
                 AccountJoinSharedCharge.create(account=account_id, shared_charge=shared_charge.id)
 
         self.parent.populate_shared_charges_table()
-        self.parent.parent.bills.update_bill_grid()
+        self.parent.parent.transactions.update_transaction_grid()
         if self.shared_charge_id:
             ui.notify("Shared charge edited.")
         else:

@@ -92,7 +92,7 @@ class UIAccountDetails:
         account.task_code = self.task_code.value
 
         account.save()
-        self.parent.bills.update_bill_grid()
+        self.parent.transactions.update_transaction_grid()
 
     def update_sysadmin_email(self, event: nicegui.events.ValueChangeEventArguments):
         selected_person = event.sender.value

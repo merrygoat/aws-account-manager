@@ -4,13 +4,12 @@ from nicegui import ui, app
 
 from aam import initialization
 from aam.models import Account, Organization
-from aam.ui.bills import UIBills
+from aam.ui.transactions import UITransactions
 from aam.ui.import_data import UIImport
 from aam.ui.settings import UISettings
 from aam.ui.account_details import UIAccountDetails
 from aam.ui.account_select import UIAccountSelect
 from aam.ui.notes import UIAccountNotes
-from aam.ui.recharges import UIRecharges
 from aam.ui.people import UIPeople
 from aam.ui.shared_charges import UISharedCharges
 
@@ -41,7 +40,7 @@ class UIMainForm:
             with splitter.before:
                 with ui.tabs().props('vertical').classes('w-full') as tabs:
                     self.accounts_tab = ui.tab('Account Details', icon='account_circle')
-                    self.bills_tab = ui.tab('Bills', icon='payments')
+                    self.transactions_tab = ui.tab('Transactions', icon='payments')
                     self.shared_charges_tab = ui.tab('Shared Charges', icon='attach_money')
                     self.import_tab = ui.tab('Import', icon='publish')
                     self.people_tab = ui.tab('People', icon='face')
@@ -54,10 +53,8 @@ class UIMainForm:
                                 self.account_details = UIAccountDetails(self)
                             with ui.column().classes('w-1/2'):
                                 self.notes = UIAccountNotes(self)
-                    with ui.tab_panel(self.bills_tab):
-                        self.bills = UIBills(self)
-                        ui.separator()
-                        self.recharges = UIRecharges(self)
+                    with ui.tab_panel(self.transactions_tab):
+                        self.transactions = UITransactions(self)
                     with ui.tab_panel(self.shared_charges_tab):
                         self.shared_charges = UISharedCharges(self)
                     with ui.tab_panel(self.import_tab):

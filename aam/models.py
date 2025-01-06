@@ -12,6 +12,7 @@ from collections.abc import Iterable
 
 import peewee
 from peewee import JOIN
+import playhouse
 
 import aam.utilities
 
@@ -70,13 +71,13 @@ class Account(BaseModel):
 
         if self.creation_date:
             required_months = aam.utilities.get_months_between(self.creation_date, end)
-            required_bills = (Bill.select(Bill.id, Month.month_code, Bill.usage, Bill.account, Month.id, Month.exchange_rate, RechargeRequest.reference)
+            required_bills = (Bill.select(Bill, Month.month_code, Month.id, Month.exchange_rate, RechargeRequest.reference)
                               .join_from(Bill, Month)
                               .join_from(Bill, RechargeRequest, JOIN.LEFT_OUTER)
                               .where((Month.month_code.in_(required_months)) & (Bill.account == self.id)))
 
             for bill in required_bills:
-                new_bill = {"id": bill.id, "month_code": bill.month.month_code, "month_date": bill.month.to_date(),
+                new_bill = {"id": bill.id, "type": bill.type, "month_code": bill.month.month_code, "month_date": bill.month.to_date(),
                             "usage_dollar": bill.usage, "support_charge": bill.support_charge(),
                             "shared_charges": bill.shared_charges(), "total_dollar": bill.total_dollar(), "total_pound": bill.total_pound()}
                 if bill.recharge_request:
@@ -145,15 +146,34 @@ class RechargeRequest(BaseModel):
     id = peewee.AutoField()
     date: datetime.date = peewee.DateField()
     reference = peewee.CharField()
+    status = peewee.CharField()
     bill: Iterable["Bill"]  # backref
+
+    def to_json(self):
+        return {"id": self.id, "date": self.date, "reference": self.reference, "status": self.status}
 
 
 class Bill(BaseModel):
     id = peewee.AutoField()
     account = peewee.ForeignKeyField(Account, backref="bills")
     month = peewee.ForeignKeyField(Month, backref="bills")
+    _type = peewee.IntegerField()
     usage: decimal.Decimal = peewee.DecimalField(null=True)
     recharge_request = peewee.ForeignKeyField(RechargeRequest, backref="bill", null=True)
+
+    @property
+    def type(self):
+        if self._type == 0:
+            return "On demand usage"
+        else:
+            raise ValueError("Getting unknown transaction type.")
+
+    @type.setter
+    def type(self, transaction_type: str):
+        if transaction_type == "On demand usage":
+            self._type = 0
+        else:
+            raise ValueError("Setting unknown transaction type.")
 
     def support_eligible(self):
         """Accounts must pay 10% charge after 01/08/24 as this was when the OGVA started."""

@@ -126,8 +126,8 @@ class UIImport:
         month = Month.get(month_code=month_code)
 
         for line in processed_lines:
-            bill = Bill.get_or_create(account=line[0], month=month.id)[0]
+            bill = Bill.get_or_create(account=line[0], month=month.id, type="On demand usage")[0]
             bill.usage = decimal.Decimal(line[-1])
             bill.save()
-        self.parent.bills.update_bill_grid()
+        self.parent.transactions.update_transaction_grid()
         ui.notify("Bills added to accounts.")
