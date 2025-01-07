@@ -57,12 +57,12 @@ class Account(BaseModel):
     closure_date: datetime.date = peewee.DateField(null=True)
     sysadmin: Iterable["Sysadmin"]  # backref
     notes: Iterable["Note"]  # backref
-    bills: Iterable["Bill"]  # backref
+    transactions: Iterable["Transaction"]  # backref
 
-    def get_bills(self) -> list[dict]:
-        """Returns a list of dicts describing bills in the account between the creation date and the account closure
+    def get_transactions(self) -> list[dict]:
+        """Returns a list of dicts describing transactions in the account between the creation date and the account closure
         date. If the account creation date is not set then return an empty list."""
-        bills = []
+        transactions = []
 
         if self.closure_date:
             end = self.closure_date
@@ -71,21 +71,22 @@ class Account(BaseModel):
 
         if self.creation_date:
             required_months = aam.utilities.get_months_between(self.creation_date, end)
-            required_bills = (Bill.select(Bill, Month.month_code, Month.id, Month.exchange_rate, RechargeRequest.reference)
-                              .join_from(Bill, Month)
-                              .join_from(Bill, RechargeRequest, JOIN.LEFT_OUTER)
-                              .where((Month.month_code.in_(required_months)) & (Bill.account == self.id)))
+            required_transactions = (Transaction.select(Transaction, Month.month_code, Month.id, Month.exchange_rate, RechargeRequest.reference)
+                                     .join_from(Transaction, Month)
+                                     .join_from(Transaction, RechargeRequest, JOIN.LEFT_OUTER)
+                                     .where((Month.month_code.in_(required_months)) & (Transaction.account == self.id)))
 
-            for bill in required_bills:
-                new_bill = {"id": bill.id, "type": bill.type, "month_code": bill.month.month_code, "month_date": bill.month.to_date(),
-                            "usage_dollar": bill.usage, "support_charge": bill.support_charge(),
-                            "shared_charges": bill.shared_charges(), "total_dollar": bill.total_dollar(), "total_pound": bill.total_pound()}
-                if bill.recharge_request:
-                    new_bill["recharge_reference"] = bill.recharge_request.reference
+            for transaction in required_transactions:
+                new_transaction = {"id": transaction.id, "type": transaction.type, "month_code": transaction.month.month_code,
+                                   "month_date": transaction.month.to_date(), "usage_dollar": transaction.usage,
+                                   "support_charge": transaction.support_charge(), "shared_charges": transaction.shared_charges(),
+                                   "total_dollar": transaction.total_dollar(), "total_pound": transaction.total_pound()}
+                if transaction.recharge_request:
+                    new_transaction["recharge_reference"] = transaction.recharge_request.reference
                 else:
-                    new_bill["recharge_reference"] = "-"
-                bills.append(new_bill)
-        return bills
+                    new_transaction["recharge_reference"] = "-"
+                transactions.append(new_transaction)
+        return transactions
 
     def final_date(self) -> datetime.date:
         if self.closure_date:
@@ -117,7 +118,7 @@ class Month(BaseModel):
     id = peewee.AutoField()
     month_code: int = peewee.IntegerField()
     exchange_rate = peewee.DecimalField()
-    bills: Iterable["Bill"]  # backref
+    transactions: Iterable["Transaction"]  # backref
     shared_charges: Iterable["SharedCharge"]  # backref
 
     @property
@@ -147,19 +148,19 @@ class RechargeRequest(BaseModel):
     date: datetime.date = peewee.DateField()
     reference = peewee.CharField()
     status = peewee.CharField()
-    bill: Iterable["Bill"]  # backref
+    transaction: Iterable["Transaction"]  # backref
 
     def to_json(self):
         return {"id": self.id, "date": self.date, "reference": self.reference, "status": self.status}
 
 
-class Bill(BaseModel):
+class Transaction(BaseModel):
     id = peewee.AutoField()
-    account = peewee.ForeignKeyField(Account, backref="bills")
-    month = peewee.ForeignKeyField(Month, backref="bills")
+    account = peewee.ForeignKeyField(Account, backref="transactions")
+    month = peewee.ForeignKeyField(Month, backref="transactions")
     _type = peewee.IntegerField()
     usage: decimal.Decimal = peewee.DecimalField(null=True)
-    recharge_request = peewee.ForeignKeyField(RechargeRequest, backref="bill", null=True)
+    recharge_request = peewee.ForeignKeyField(RechargeRequest, backref="transaction", null=True)
 
     @property
     def type(self):
@@ -198,14 +199,14 @@ class Bill(BaseModel):
         return total
 
     def total_dollar(self) -> Decimal | None:
-        """Calculate the total bill for the month."""
+        """Calculate the total cost for the month."""
         if self.usage is None:
             return None
         else:
             return self.usage + self.support_charge() + self.shared_charges()
 
     def total_pound(self) -> Decimal | None:
-        """Calculate the total bill for the month."""
+        """Calculate the total cost for the month."""
         total_dollar = self.total_dollar()
         if total_dollar is None:
             return None
@@ -246,5 +247,5 @@ class AccountJoinSharedCharge(BaseModel):
         primary_key = peewee.CompositeKey('account', 'shared_charge')
 
 
-db.create_tables([Account, LastAccountUpdate, Person, Sysadmin, Note, Month, Bill, RechargeRequest,
+db.create_tables([Account, LastAccountUpdate, Person, Sysadmin, Note, Month, Transaction, RechargeRequest,
                   SharedCharge, AccountJoinSharedCharge, Organization])

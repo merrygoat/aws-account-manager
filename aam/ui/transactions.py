@@ -6,7 +6,7 @@ import nicegui.events
 from nicegui import ui
 
 from aam import utilities
-from aam.models import Account, Bill, Month, Person, RechargeRequest
+from aam.models import Account, Transaction, Month, Person, RechargeRequest
 from aam.utilities import get_months_between
 
 if TYPE_CHECKING:
@@ -54,34 +54,43 @@ class UITransactions:
     def initialize(self, account: Account | None):
         """This function is run when an account is selected from the dropdown menu."""
         if account is not None and account.creation_date:
-            bills = account.get_bills()
+            transactions = account.get_transactions()
             required_bill_months = get_months_between(account.creation_date, account.final_date())
-            actual_bill_months = [bill["month_code"] for bill in bills]
+            actual_bill_months = [bill["month_code"] for bill in transactions]
             missing_months = set(required_bill_months) - set(actual_bill_months)
 
             if missing_months:
                 for month_code in missing_months:
-                    Bill.get_or_create(account=account.id, month=Month.get(month_code=month_code), type="On demand usage")
-                bills = account.get_bills()
-            self.transaction_grid.options["rowData"] = bills
+                    Transaction.get_or_create(account=account.id, month=Month.get(month_code=month_code), type="On demand usage")
+                transactions = account.get_transactions()
+            self.transaction_grid.options["rowData"] = transactions
         else:
             self.transaction_grid.options["rowData"] = {}
         self.transaction_grid.update()
+
+    def add_new_transaction(self):
+        account = self.parent.get_selected_account()
+        if account is None:
+            ui.notify("No account selected to add transaction")
+            return 0
+
+        self.new_transaction_dialog.open(account)
+
 
     def update_transaction_grid(self):
         account = self.parent.get_selected_account()
         if account is None:
             row_data = []
         else:
-            row_data = account.get_bills()
+            row_data = account.get_transactions()
         self.transaction_grid.options["rowData"] = row_data
         self.transaction_grid.update()
 
     def update_transaction(self, event: nicegui.events.GenericEventArguments):
-        bill_id = event.args["data"]["id"]
-        bill = Bill.get(id=bill_id)
-        bill.usage = event.args["data"]["usage_dollar"]
-        bill.save()
+        transaction_id = event.args["data"]["id"]
+        transaction = Transaction.get(id=transaction_id)
+        transaction.usage = event.args["data"]["usage_dollar"]
+        transaction.save()
         self.update_transaction_grid()
 
     async def get_selected_rows(self) -> list[dict]:
@@ -136,7 +145,7 @@ class UIRechargeRequests:
             ui.notify("No recharge request selected to delete.")
             return 0
         request = RechargeRequest.get(selected_row["id"])
-        if request.bill:
+        if request.transaction:
             ui.notify("Recharge request has recharges. These must be removed before deleting the request.")
             return 0
         else:
@@ -151,28 +160,28 @@ class UIRechargeRequests:
             return 0
 
         request_id = selected_row["id"]
-        bills = (Bill.select(Bill, Account, Person)
+        transactions = (Transaction.select(Transaction, Account, Person)
                  .join(Account)
                  .join(Person)
-                 .where(Bill.recharge_request == request_id))
-        if not bills:
+                 .where(Transaction.recharge_request == request_id))
+        if not transactions:
             ui.notify("Cannot export recharge request as it has no recharges.")
             return 0
 
-        # Group bills by account
-        bill_dict = {}
-        for bill in bills:
-            if bill.account.id not in bill_dict:
-                bill_dict[bill.account.id] = []
-            bill_dict[bill.account.id].append(bill)
+        # Group transactions by account
+        transaction_dict = {}
+        for transaction in transactions:
+            if transaction.account.id not in transaction_dict:
+                transaction_dict[transaction.account.id] = []
+            transaction_dict[transaction.account.id].append(transaction)
 
         export_string = "Account Number, Account Name, Budget Holder Name, Budget Holder Email, CC email, Finance Code, Task Code, Total\n"
-        for account_number, bills in bill_dict.items():
+        for account_number, transactions in transaction_dict.items():
             total = Decimal(0)
-            for bill in bills:
-                total += bill.total_pound()
+            for transaction in transactions:
+                total += transaction.total_pound()
             total = round(total, 2)
-            account = bills[0].account
+            account = transactions[0].account
             export_string += f"{account_number}, {account.name}, {account.budget_holder.first_name}, {account.budget_holder.email}, , {account.finance_code}, {account.task_code}, {total}\n"
 
         recharge_request = RechargeRequest.get(id=request_id)
@@ -185,9 +194,10 @@ class UIRequestItems:
 
         ui.label("Request items").classes("text-4xl")
         self.request_items_grid = ui.aggrid({
-            'columnDefs': [{"headerName": "bill_id", "field": "bill_id", "hide": True},
+            'columnDefs': [{"headerName": "transaction_id", "field": "transaction_id", "hide": True},
                            {"headerName": "Account", "field": "account_name", "sort": "asc", "sortIndex": 0},
-                           {"headerName": "Month", "field": "month_date", "sort": "asc", "sortIndex": 1},
+                           {"headerName": "Date", "field": "date", "sort": "asc", "sortIndex": 1},
+                           {"headerName": "Type", "field": "type"},
                            {"headerName": "Amount (£)", "field": "recharge_amount",
                             "valueFormatter": "value.toFixed(2)"}],
             'rowData': {},
@@ -195,19 +205,20 @@ class UIRequestItems:
             'stopEditingWhenCellsLoseFocus': True,
         })
         with ui.row():
-            self.add_to_recharge_request_button = ui.button("Add selected bills to request",
+            self.add_to_recharge_request_button = ui.button("Add selected transactions to request",
                                                             on_click=self.add_transaction_to_request)
-            self.remove_recharge_button = ui.button("Remove selected items from request", on_click=self.remove_transaction_from_request)
+            self.remove_recharge_button = ui.button("Remove selected transactions from request", on_click=self.remove_transaction_from_request)
 
     def update_request_items_grid(self, request_id: int):
-        bills = (Bill.select(Bill, Account, Month)
-                     .join_from(Bill, Account)
-                     .join_from(Bill, Month)
-                     .where(Bill.recharge_request == request_id))
+        transactions = (Transaction.select(Transaction, Account, Month)
+                        .join_from(Transaction, Account)
+                        .join_from(Transaction, Month)
+                        .where(Transaction.recharge_request == request_id))
         recharges_list = []
-        for bill in bills:
-            recharges_list.append({"bill_id": bill.id, "account_name": f"{bill.account.name} - {bill.account}",
-                                   "month_date": bill.month.to_date(), "recharge_amount": bill.total_pound()})
+        for transaction in transactions:
+            recharges_list.append({"transaction_id": transaction.id, "account_name": f"{transaction.account.name} - {transaction.account}",
+                                   "date": transaction.month.to_date(), "type": transaction.type,
+                                   "recharge_amount": transaction.total_pound()})
         self.request_items_grid.options["rowData"] = recharges_list
         self.request_items_grid.update()
 
@@ -223,25 +234,30 @@ class UIRequestItems:
             ui.notify("No transactions selected")
             return 0
 
-        bill_ids = [row["id"] for row in selected_transaction_rows]
-        bills = Bill.select().where(Bill.id.in_(bill_ids))
-        for bill in bills:
-            if bill.usage is None:
-                ui.notify(f"Cannot add bill for month {str(bill.month)} as it has no recorded usage.")
+        transaction_ids = [row["id"] for row in selected_transaction_rows]
+        transactions = Transaction.select().where(Transaction.id.in_(transaction_ids))
+        for transaction in transactions:
+            if transaction.usage is None:
+                ui.notify(f"Cannot add transaction for month {str(transaction.month)} as it has no recorded usage.")
             else:
-                bill.recharge_request = selected_recharge_id
-                bill.save()
+                transaction.recharge_request = selected_recharge_id
+                transaction.save()
         self.parent.parent.transactions.update_transaction_grid()
         self.update_request_items_grid(selected_recharge_id)
 
     async def remove_transaction_from_request(self):
         selected_rows = await(self.request_items_grid.get_selected_rows())
-        selected_bills = [row["bill_id"] for row in selected_rows]
 
-        bills = Bill.select().where(Bill.id.in_(selected_bills))
-        for bill in bills:
-            bill.recharge_request = None
-            bill.save()
+        if selected_rows is None:
+            ui.notify("No transactions selected to remove.")
+            return 0
+
+        selected_transactions = [row["transaction_id"] for row in selected_rows]
+
+        transactions = Transaction.select().where(Transaction.id.in_(selected_transactions))
+        for transaction in transactions:
+            transaction.recharge_request = None
+            transaction.save()
 
         selected_request_row = await(self.parent.ui_recharge_requests.recharge_request_grid.get_selected_row())
         selected_request_id = selected_request_row["id"]

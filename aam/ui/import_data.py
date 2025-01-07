@@ -7,7 +7,7 @@ import nicegui.events
 from nicegui import ui
 
 import aam.utilities
-from aam.models import Account, Month, Bill
+from aam.models import Account, Month, Transaction
 from aam.utilities import month_select, year_select
 
 if TYPE_CHECKING:
@@ -18,7 +18,7 @@ class UIImport:
     def __init__(self, parent: "UIMainForm"):
         self.parent = parent
         ui.html("Import data").classes("text-xl")
-        self.import_type = ui.select({1: "Billing Data", 2:"Exchange Rate"}, label="Import Type", value=1,
+        self.import_type = ui.select({1: "Transaction Data", 2:"Exchange Rate"}, label="Import Type", value=1,
                                      on_change=self.import_type_selected)
         self.description = ui.label("")
         with ui.grid(columns="auto auto").classes("place-items-center gap-1") as self.date_pick_grid:
@@ -29,13 +29,13 @@ class UIImport:
         self.import_textbox = ui.textarea("Raw data").classes("w-1/2")
         self.import_button = ui.button("Import data", on_click=self.import_data)
 
-    'Data must be in the format: "account number, bill amount" with one account per line. '
+    'Data must be in the format: "account number, transaction amount" with one account per line. '
     'Comma is the only valid field separator.'
 
     def import_type_selected(self, event: nicegui.events.ValueChangeEventArguments):
         selected_person = event.sender.value
         if selected_person == 1:
-            self.description = ('Data must be in the format: "account number, bill amount" with one account per line. '
+            self.description = ('Data must be in the format: "account number, transaction amount" with one account per line. '
                                 'Comma is the only valid field separator.')
             self.date_pick_grid.set_visibility(True)
         elif selected_person == 2:
@@ -46,7 +46,7 @@ class UIImport:
     def import_data(self, event: nicegui.events.ClickEventArguments):
         import_type = self.import_type.value
         if import_type == 1:
-            self.import_billing()
+            self.import_transactions()
         elif import_type == 2:
             self.import_exchange_rate()
 
@@ -75,7 +75,7 @@ class UIImport:
         self.parent.settings.ui_exchange_rate.populate_exchange_rate_grid()
         ui.notify("Exchange rates imported.")
 
-    def import_billing(self):
+    def import_transactions(self):
         data = self.import_textbox.value
         if not data:
             ui.notify("No data to import.")
@@ -115,7 +115,7 @@ class UIImport:
             try:
                 decimal.Decimal(line[-1])
             except decimal.InvalidOperation:
-                ui.notify(f"Malformed bill amount on line {index} - unable to convert to Decimal")
+                ui.notify(f"Malformed transaction amount on line {index} - unable to convert to Decimal")
                 return 0
             processed_lines.append(line)
         ui.notify("Data is valid.")
@@ -126,8 +126,8 @@ class UIImport:
         month = Month.get(month_code=month_code)
 
         for line in processed_lines:
-            bill = Bill.get_or_create(account=line[0], month=month.id, type="On demand usage")[0]
-            bill.usage = decimal.Decimal(line[-1])
-            bill.save()
+            transaction = Transaction.get_or_create(account=line[0], month=month.id, type="On demand usage")[0]
+            transaction.usage = decimal.Decimal(line[-1])
+            transaction.save()
         self.parent.transactions.update_transaction_grid()
-        ui.notify("Bills added to accounts.")
+        ui.notify("Transactions added to accounts.")
