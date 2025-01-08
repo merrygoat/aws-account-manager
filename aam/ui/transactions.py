@@ -44,7 +44,9 @@ class UITransactions:
             'stopEditingWhenCellsLoseFocus': True,
         })
         self.transaction_grid.on("cellValueChanged", self.update_transaction)
-        ui.button("Add new transaction", on_click=self.add_new_transaction)
+        with ui.row():
+            ui.button("Add new transaction", on_click=self.add_new_transaction)
+            ui.button("Delete selected transaction", on_click=self.delete_selected_transaction)
         ui.separator()
 
         with ui.row().classes('w-full no-wrap'):
@@ -66,6 +68,27 @@ class UITransactions:
             return 0
 
         self.new_transaction_dialog.open(account)
+
+    async def delete_selected_transaction(self, event: nicegui.events.ClickEventArguments):
+        selected_rows = await(self.get_selected_rows())
+        if selected_rows is None:
+            ui.notify("No recharge request selected")
+            return 0
+        transaction_ids = [row["id"] for row in selected_rows]
+
+        transactions = Transaction.select().where(Transaction.id.in_(transaction_ids))
+        for transaction in transactions:
+            if transaction.type == "Monthly":
+                ui.notify(f"Cannot delete 'Monthly' type transactions.")
+                return 0
+        for transaction in transactions:
+            transaction.delete_instance()
+            self.update_transaction_grid()
+            selected_request_row = await(self.ui_recharge_requests.recharge_request_grid.get_selected_row())
+            if selected_request_row:
+                self.ui_request_items.update_request_items_grid(selected_request_row["id"])
+            ui.notify("Transaction deleted.")
+
 
     def update_transaction_grid(self):
         account = self.parent.get_selected_account()
@@ -204,7 +227,10 @@ class UIRequestItems:
                                                             on_click=self.add_transaction_to_request)
             self.remove_recharge_button = ui.button("Remove selected transactions from request", on_click=self.remove_transaction_from_request)
 
-    def update_request_items_grid(self, request_id: int):
+    def update_request_items_grid(self, request_id: int | None):
+        if request_id is None:
+            return 0
+
         transactions = (Transaction.select(Transaction, Account)
                         .join(Account)
                         .where(Transaction.recharge_request == request_id))
