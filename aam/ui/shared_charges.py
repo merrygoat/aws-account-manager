@@ -155,7 +155,7 @@ class UISharedChargeDialog:
              .execute())
 
             shared_charge.name = self.name.value
-            shared_charge.amount = amount
+            shared_charge.amount_pound = amount
             shared_charge.month = month.id
             shared_charge.save()
         else:

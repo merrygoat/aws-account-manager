@@ -33,3 +33,14 @@ def year_select() -> ui.select:
 
 def month_code(year: int, month: int) -> int:
     return year * 12 + month
+
+
+def year_from_month_code(code: int) -> int:
+    return (code - 1) // 12
+
+
+def month_from_month_code(code: int) -> int:
+    month = code % 12
+    if month == 0:
+        month = 12
+    return month

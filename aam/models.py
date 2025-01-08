@@ -12,7 +12,7 @@ from collections.abc import Iterable
 
 import peewee
 from peewee import JOIN
-import playhouse
+from playhouse.hybrid import hybrid_property
 
 import aam.utilities
 
@@ -60,35 +60,35 @@ class Account(BaseModel):
     transactions: Iterable["Transaction"]  # backref
 
     def get_transactions(self) -> list[dict]:
-        """Returns a list of dicts describing transactions in the account between the creation date and the account closure
-        date. If the account creation date is not set then return an empty list."""
-        transactions = []
+        """Returns a list of dicts describing month transactions in the account between the creation date and the
+        account closure date. If the account creation date is not set then return an empty list."""
+        if not self.creation_date:
+            return []
 
-        if self.closure_date:
-            end = self.closure_date
-        else:
-            end = datetime.date.today()
+        required_months = aam.utilities.get_months_between(self.creation_date, self.final_date())
 
-        if self.creation_date:
-            required_months = aam.utilities.get_months_between(self.creation_date, end)
-            required_transactions = (Transaction.select(Transaction, Month.month_code, Month.id, Month.exchange_rate, RechargeRequest.reference)
-                                     .join_from(Transaction, Month)
-                                     .join_from(Transaction, RechargeRequest, JOIN.LEFT_OUTER)
-                                     .where((Month.month_code.in_(required_months)) & (Transaction.account == self.id)))
+        self._check_missing_monthly_transactions(required_months)
 
-            for transaction in required_transactions:
-                new_transaction = {"id": transaction.id, "type": transaction.type, "month_code": transaction.month.month_code,
-                                   "month_date": transaction.month.to_date(), "usage_dollar": transaction.usage,
-                                   "support_charge": transaction.support_charge(), "shared_charges": transaction.shared_charges(),
-                                   "total_dollar": transaction.total_dollar(), "total_pound": transaction.total_pound()}
-                if transaction.recharge_request:
-                    new_transaction["recharge_reference"] = transaction.recharge_request.reference
-                else:
-                    new_transaction["recharge_reference"] = "-"
-                transactions.append(new_transaction)
+        required_transactions = (Transaction.select(Transaction, RechargeRequest.reference)
+            .join(RechargeRequest, JOIN.LEFT_OUTER)
+            .where((Transaction.month_code.in_(required_months)) & (Transaction.account == self.id)))
+
+        transactions = [transaction.to_json() for transaction in required_transactions]
         return transactions
 
+    def _check_missing_monthly_transactions(self, required_months: list[int]):
+        """Accounts should have a usage transaction for each month the account is open. This function checks if the
+        account has 'monthly' type transactions for each month code in `required_months`."""
+        required_transactions = (Transaction.select().where((Transaction.month_code.in_(required_months)) & (Transaction.account == self.id) & (Transaction.type == "Monthly")))
+        existing_transaction_months = [transaction.month_code for transaction in required_transactions]
+        missing_months = set(required_months) - set(existing_transaction_months)
+        if missing_months:
+            for month_code in missing_months:
+                date = datetime.date(year=aam.utilities.year_from_month_code(month_code), month=aam.utilities.month_from_month_code(month_code), day=1)
+                Transaction.create(account=self.id, type="Monthly", date=date, is_pound=False)
+
     def final_date(self) -> datetime.date:
+        """Return the final date on which the account is active."""
         if self.closure_date:
             return self.closure_date
         else:
@@ -117,21 +117,17 @@ class Note(BaseModel):
 class Month(BaseModel):
     id = peewee.AutoField()
     month_code: int = peewee.IntegerField()
-    exchange_rate = peewee.DecimalField()
-    transactions: Iterable["Transaction"]  # backref
+    exchange_rate: Decimal = peewee.DecimalField()
     shared_charges: Iterable["SharedCharge"]  # backref
 
     @property
     def year(self) -> int:
-        return (self.month_code - 1) // 12
+        return aam.utilities.year_from_month_code(self.month_code)
 
     @property
-    def month(self):
+    def month(self) -> int:
         """Months start at 1, e.g. Jan = 1, Feb = 2"""
-        month = self.month_code % 12
-        if month == 0:
-            month = 12
-        return month
+        return aam.utilities.month_from_month_code(self.month_code)
 
     def __repr__(self):
         return f"Month: {calendar.month_abbr[self.month]}-{self.year}"
@@ -148,46 +144,89 @@ class RechargeRequest(BaseModel):
     date: datetime.date = peewee.DateField()
     reference = peewee.CharField()
     status = peewee.CharField()
-    transaction: Iterable["Transaction"]  # backref
+    transactions: Iterable["Transaction"]  # backref
 
     def to_json(self):
         return {"id": self.id, "date": self.date, "reference": self.reference, "status": self.status}
 
-
 class Transaction(BaseModel):
     id = peewee.AutoField()
     account = peewee.ForeignKeyField(Account, backref="transactions")
-    month = peewee.ForeignKeyField(Month, backref="transactions")
-    _type = peewee.IntegerField()
-    usage: decimal.Decimal = peewee.DecimalField(null=True)
-    recharge_request = peewee.ForeignKeyField(RechargeRequest, backref="transaction", null=True)
+    type = peewee.CharField()  # ["Monthly", "Pre-pay", "Savings plan", "Adjustment"]
+    date: datetime.date = peewee.DateField()
+    amount: Decimal = peewee.DecimalField(null=True)
+    is_pound = peewee.BooleanField()
+    _exchange_rate: Decimal = peewee.DecimalField(null=True)   # USD/GBP
+    recharge_request = peewee.ForeignKeyField(RechargeRequest, backref="transactions", null=True)
+
+    def to_json(self) -> dict:
+        transaction = {"id": self.id, "account_id": self.account.id, "type": self.type, "date": self.date,
+                       "amount": self.amount}
+        if self.is_pound:
+            # Accounts are settled in pounds so there is no reason to convert a pound transaction to a dollar value
+            transaction.update({"currency": "£", "support_charge": "-", "shared_charge": "-",
+                                "total_pound": self.total_pound})
+        else:
+            transaction.update({"currency": "$", "support_charge": self.support_charge,
+                                "shared_charge": self.shared_charges, "exchange_rate": self.exchange_rate,
+                                "total_dollar": self.total_dollar, "total_pound": self.total_pound})
+
+        if self.recharge_request:
+            transaction["recharge_reference"] = self.recharge_request.reference
+        else:
+            transaction["recharge_reference"] = "-"
+        return transaction
+
+    @hybrid_property
+    def month_code(self) -> int:
+        return aam.utilities.month_code(self.date.year, self.date.month)
 
     @property
-    def type(self):
-        if self._type == 0:
-            return "On demand usage"
+    def month(self) -> Month:
+        return Month.get(Month.month_code == self.month_code)
+
+    @property
+    def exchange_rate(self) -> decimal.Decimal:
+        if self.type == "Monthly":
+            return self.month.exchange_rate
         else:
-            raise ValueError("Getting unknown transaction type.")
+            return self._exchange_rate
 
-    @type.setter
-    def type(self, transaction_type: str):
-        if transaction_type == "On demand usage":
-            self._type = 0
-        else:
-            raise ValueError("Setting unknown transaction type.")
-
-    def support_eligible(self):
-        """Accounts must pay 10% charge after 01/08/24 as this was when the OGVA started."""
-        return self.month.month_code >= 2024 * 12 + 8
-
-    def support_charge(self) -> Decimal | None:
-        if self.usage is None:
+    @property
+    def amount_pound(self) -> decimal.Decimal | None:
+        if not self.amount:
             return None
-        if self.support_eligible():
-            return self.usage * Decimal(0.1)
+        if self.is_pound:
+            return self.amount
+        else:
+            return self.amount * self.exchange_rate
+
+    @property
+    def amount_dollar(self) -> decimal.Decimal | None:
+        if not self.amount:
+            return None
+        if not self.is_pound:
+            return self.amount
+        else:
+            if self.exchange_rate:
+                return self.amount / self.exchange_rate
+            else:
+                return None
+
+    @property
+    def support_eligible(self) -> bool:
+        """Accounts must pay 10% charge after 01/08/24 as this was when the OGVA started."""
+        return (self.type == "Monthly") and (self.date >= datetime.date(2024, 8, 1))
+
+    @property
+    def support_charge(self) -> Decimal:
+        """If the transaction needs to be charged for support, return the amount in dollars."""
+        if self.support_eligible and self.amount_dollar:
+            return self.amount_dollar * Decimal(0.1)
         else:
             return Decimal(0)
 
+    @property
     def shared_charges(self) -> decimal.Decimal:
         if self.account.id is None or self.month.id is None:
             raise ValueError("Calculation of shared charges failed due to missing data.")
@@ -198,20 +237,23 @@ class Transaction(BaseModel):
             total += charge.cost_per_account()
         return total
 
+    @property
     def total_dollar(self) -> Decimal | None:
         """Calculate the total cost for the month."""
-        if self.usage is None:
+        if self.amount is None or self.amount_dollar is None:
             return None
         else:
-            return self.usage + self.support_charge() + self.shared_charges()
+            return self.amount_dollar + self.support_charge + self.shared_charges
 
+    @property
     def total_pound(self) -> Decimal | None:
-        """Calculate the total cost for the month."""
-        total_dollar = self.total_dollar()
-        if total_dollar is None:
+        """Calculate the total cost of the transaction."""
+        if self.is_pound:
+            return self.amount
+        if self.total_dollar is None:
             return None
         else:
-            return  self.total_dollar() * self.month.exchange_rate
+            return  self.total_dollar * self.exchange_rate
 
 
 class SharedCharge(BaseModel):

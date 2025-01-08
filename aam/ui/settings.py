@@ -103,6 +103,7 @@ class UIOrganizations:
         else:
             ui.notify("No organization selected to delete.")
 
+
 class UINewOrganizationDialog:
     def __init__(self, parent: UIOrganizations):
         self.parent = parent

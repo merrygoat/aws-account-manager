@@ -1,4 +1,5 @@
 import datetime
+import decimal
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
@@ -6,8 +7,7 @@ import nicegui.events
 from nicegui import ui
 
 from aam import utilities
-from aam.models import Account, Transaction, Month, Person, RechargeRequest
-from aam.utilities import get_months_between
+from aam.models import Account, Person, RechargeRequest, Transaction
 
 if TYPE_CHECKING:
     from aam.main import UIMainForm
@@ -18,18 +18,21 @@ class UITransactions:
         self.parent = parent
 
         self.new_request_dialog = UINewRechargeDialog(self)
+        self.new_transaction_dialog = UINewSingleTransactionDialog(self)
 
         ui.label("Account transactions").classes("text-4xl")
         self.transaction_grid = ui.aggrid({
             'defaultColDef': {"suppressMovable": True},
             'columnDefs': [{"headerName": "id", "field": "id", "hide": True},
-                           {"headerName": "Month", "field": "month_date", "sort": "asc"},
+                           {"headerName": "Date", "field": "date", "sort": "asc"},
                            {"headerName": "Type", "field": "type"},
-                           {"headerName": "Usage ($)", "field": "usage_dollar", "editable": True,
+                           {"headerName": "Currency", "field": "currency", "editable": True,
+                            "valueFormatter": "value.toFixed(2)"},
+                           {"headerName": "Amount (£)", "field": "amount", "editable": True,
                             "valueFormatter": "value.toFixed(2)"},
                            {"headerName": "Support Charge ($)", "field": "support_charge",
                             "valueFormatter": "value.toFixed(2)"},
-                           {"headerName": "Shared Charges ($)", "field": "shared_charges",
+                           {"headerName": "Shared Charges ($)", "field": "shared_charge",
                             "valueFormatter": "value.toFixed(2)"},
                            {"headerName": "Total ($)", "field": "total_dollar",
                             "valueFormatter": "value.toFixed(2)"},
@@ -41,6 +44,7 @@ class UITransactions:
             'stopEditingWhenCellsLoseFocus': True,
         })
         self.transaction_grid.on("cellValueChanged", self.update_transaction)
+        ui.button("Add new transaction", on_click=self.add_new_transaction)
         ui.separator()
 
         with ui.row().classes('w-full no-wrap'):
@@ -50,23 +54,10 @@ class UITransactions:
             with ui.column().classes("w-2/3"):
                 self.ui_request_items = UIRequestItems(self)
 
-
     def initialize(self, account: Account | None):
         """This function is run when an account is selected from the dropdown menu."""
         if account is not None and account.creation_date:
-            transactions = account.get_transactions()
-            required_bill_months = get_months_between(account.creation_date, account.final_date())
-            actual_bill_months = [bill["month_code"] for bill in transactions]
-            missing_months = set(required_bill_months) - set(actual_bill_months)
-
-            if missing_months:
-                for month_code in missing_months:
-                    Transaction.get_or_create(account=account.id, month=Month.get(month_code=month_code), type="On demand usage")
-                transactions = account.get_transactions()
-            self.transaction_grid.options["rowData"] = transactions
-        else:
-            self.transaction_grid.options["rowData"] = {}
-        self.transaction_grid.update()
+            self.update_transaction_grid()
 
     def add_new_transaction(self):
         account = self.parent.get_selected_account()
@@ -75,7 +66,6 @@ class UITransactions:
             return 0
 
         self.new_transaction_dialog.open(account)
-
 
     def update_transaction_grid(self):
         account = self.parent.get_selected_account()
@@ -88,8 +78,13 @@ class UITransactions:
 
     def update_transaction(self, event: nicegui.events.GenericEventArguments):
         transaction_id = event.args["data"]["id"]
-        transaction = Transaction.get(id=transaction_id)
-        transaction.usage = event.args["data"]["usage_dollar"]
+        transaction: Transaction = Transaction.get(id=transaction_id)
+        try:
+            amount = decimal.Decimal(event.args["data"]["amount"])
+        except decimal.InvalidOperation:
+            ui.notify("Invalid amount for transaction - must be a number")
+            return 0
+        transaction.amount = amount
         transaction.save()
         self.update_transaction_grid()
 
@@ -161,9 +156,9 @@ class UIRechargeRequests:
 
         request_id = selected_row["id"]
         transactions = (Transaction.select(Transaction, Account, Person)
-                 .join(Account)
-                 .join(Person)
-                 .where(Transaction.recharge_request == request_id))
+                        .join(Account)
+                        .join(Person)
+                        .where(Transaction.recharge_request == request_id))
         if not transactions:
             ui.notify("Cannot export recharge request as it has no recharges.")
             return 0
@@ -210,15 +205,13 @@ class UIRequestItems:
             self.remove_recharge_button = ui.button("Remove selected transactions from request", on_click=self.remove_transaction_from_request)
 
     def update_request_items_grid(self, request_id: int):
-        transactions = (Transaction.select(Transaction, Account, Month)
-                        .join_from(Transaction, Account)
-                        .join_from(Transaction, Month)
+        transactions = (Transaction.select(Transaction, Account)
+                        .join(Account)
                         .where(Transaction.recharge_request == request_id))
         recharges_list = []
         for transaction in transactions:
             recharges_list.append({"transaction_id": transaction.id, "account_name": f"{transaction.account.name} - {transaction.account}",
-                                   "date": transaction.month.to_date(), "type": transaction.type,
-                                   "recharge_amount": transaction.total_pound()})
+                                   "date": transaction.date, "type": transaction.type, "recharge_amount": transaction.total_pound})
         self.request_items_grid.options["rowData"] = recharges_list
         self.request_items_grid.update()
 
@@ -237,12 +230,12 @@ class UIRequestItems:
         transaction_ids = [row["id"] for row in selected_transaction_rows]
         transactions = Transaction.select().where(Transaction.id.in_(transaction_ids))
         for transaction in transactions:
-            if transaction.usage is None:
-                ui.notify(f"Cannot add transaction for month {str(transaction.month)} as it has no recorded usage.")
+            if transaction.amount is None:
+                ui.notify(f"Cannot add transaction for date {str(transaction.date)} as it has no recorded usage.")
             else:
                 transaction.recharge_request = selected_recharge_id
                 transaction.save()
-        self.parent.parent.transactions.update_transaction_grid()
+        self.parent.update_transaction_grid()
         self.update_request_items_grid(selected_recharge_id)
 
     async def remove_transaction_from_request(self):
@@ -265,6 +258,70 @@ class UIRequestItems:
         self.update_request_items_grid(selected_request_id)
         self.parent.update_transaction_grid()
 
+
+class UINewSingleTransactionDialog:
+    def __init__(self, parent: UITransactions):
+        self.parent = parent
+        self.selected_account: Account | None = None
+
+        with ui.dialog() as self.dialog:
+            with ui.card():
+                ui.label("New transaction").classes("text-2xl")
+                with ui.grid(columns="auto auto"):
+                    ui.label("Date")
+                    self.date_input = utilities.date_picker()
+                    ui.label("Type")
+                    self.type = ui.select(options=["Savings Plan", "Pre-pay", "Adjustment"]).classes("q-field--dense")
+                    ui.label("Currency")
+                    self.currency_toggle = ui.radio(["Pound", "Dollar"], value="Pound", on_change=self.change_currency).props('inline')
+                    ui.label("Amount")
+                    self.amount = ui.input()
+                    self.exchange_rate_label = ui.label("Exchange rate (USD/GBP)")
+                    self.exchange_rate = ui.input("Exchange rate")
+                    ui.button("Add", on_click=self.new_transaction)
+                    ui.button("Cancel", on_click=self.dialog.close)
+        self.set_currency(True)
+
+    def open(self, account: Account):
+        self.selected_account = account
+        self.dialog.open()
+
+    def new_transaction(self):
+        if not self.date_input.value:
+            ui.notify("Must specify transaction date.")
+            return 0
+
+        if not self.type.value:
+            ui.notify("Must specify transaction type.")
+            return 0
+
+        amount = self.amount.value
+
+        try:
+            amount = decimal.Decimal(amount)
+        except decimal.InvalidOperation:
+            ui.notify("Invalid value for amount. Must be a number.")
+            return 0
+
+        if self.currency_toggle.value == "Dollar":
+            exchange_rate = Decimal(self.exchange_rate.value)
+            is_pound = False
+        else:
+            exchange_rate = None
+            is_pound = True
+
+        Transaction.create(account=self.selected_account.id, type=self.type.value, date=self.date_input.value,
+                           amount=amount, is_pound=is_pound, _exchange_rate=exchange_rate)
+        self.parent.update_transaction_grid()
+        ui.notify("New transaction added.")
+        self.dialog.close()
+
+    def change_currency(self, event: nicegui.events.ValueChangeEventArguments):
+        self.set_currency(bool(event.value == "Pound"))
+
+    def set_currency(self, pound: bool):
+        self.exchange_rate_label.set_visibility(not pound)
+        self.exchange_rate.set_visibility(not pound)
 
 class UINewRechargeDialog:
     def __init__(self, parent: UITransactions):

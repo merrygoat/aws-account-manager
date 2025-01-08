@@ -122,12 +122,16 @@ class UIImport:
 
         month = self.month.value
         year = self.year.value
-        month_code = aam.utilities.month_code(year, month)
-        month = Month.get(month_code=month_code)
+        date = datetime.date(year, month, 1)
 
         for line in processed_lines:
-            transaction = Transaction.get_or_create(account=line[0], month=month.id, type="On demand usage")[0]
-            transaction.usage = decimal.Decimal(line[-1])
-            transaction.save()
+            transaction = Transaction.get_or_none(account=line[0], type="Monthly", date=date)
+            if transaction:
+                transaction.amount = decimal.Decimal(line[-1])
+                transaction.save()
+            else:
+                Transaction.create(account=line[0], type="Monthly", date=date, amount=decimal.Decimal(line[-1]),
+                                   is_pound=False)
+
         self.parent.transactions.update_transaction_grid()
         ui.notify("Transactions added to accounts.")
