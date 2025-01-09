@@ -7,7 +7,7 @@ import nicegui.events
 from nicegui import ui
 
 import aam.utilities
-from aam.models import Account, Month, Transaction
+from aam.models import Account, Month, Transaction, Person, Sysadmin
 from aam.utilities import month_select, year_select
 
 if TYPE_CHECKING:
@@ -18,7 +18,7 @@ class UIImport:
     def __init__(self, parent: "UIMainForm"):
         self.parent = parent
         ui.html("Import data").classes("text-xl")
-        self.import_type = ui.select({1: "Transaction Data", 2:"Exchange Rate"}, label="Import Type", value=1,
+        self.import_type = ui.select({1: "Transaction Data - One month", 2:"Transaction Data - One account", 3:"Exchange Rate", 4:"Account Details"}, label="Import Type", value=1,
                                      on_change=self.import_type_selected)
         self.description = ui.label("")
         with ui.grid(columns="auto auto").classes("place-items-center gap-1") as self.date_pick_grid:
@@ -26,35 +26,56 @@ class UIImport:
             ui.label("Year")
             self.month = month_select()
             self.year = year_select()
+        self.gross_toggle = ui.radio(["Net", "Gross"], value="Net").props('inline')
         self.import_textbox = ui.textarea("Raw data").classes("w-1/2")
         self.import_button = ui.button("Import data", on_click=self.import_data)
+
+        self.gross_toggle.set_visibility(False)
 
     'Data must be in the format: "account number, transaction amount" with one account per line. '
     'Comma is the only valid field separator.'
 
     def import_type_selected(self, event: nicegui.events.ValueChangeEventArguments):
-        selected_person = event.sender.value
-        if selected_person == 1:
-            self.description = ('Data must be in the format: "account number, transaction amount" with one account per line. '
-                                'Comma is the only valid field separator.')
+        import_type = event.sender.value
+        if import_type == 1:
+            self.description.text = ('Data must be in the format: "account number, transaction amount" with one account '
+                                     'per line. Comma or tab can be use as field separators.')
             self.date_pick_grid.set_visibility(True)
-        elif selected_person == 2:
-            self.description = ('Data must be in the format, "Month-year, exchange_rate, with one month per line.'
-                                'e.g "Mar-23, 0.756473".')
+            self.gross_toggle.set_visibility(False)
+        elif import_type == 2:
+            self.description.text = ('Data must be in the format, "Month-year, amount ($)", with one month per line'
+                                     'and the account number on its own on the first line.')
             self.date_pick_grid.set_visibility(False)
+            self.gross_toggle.set_visibility(True)
+        elif import_type == 3:
+            self.description.text = ('Data must be in the format, "Month-year, exchange_rate", with one month per line.'
+                                     'e.g "Mar-23, 0.756473".')
+            self.date_pick_grid.set_visibility(False)
+            self.gross_toggle.set_visibility(False)
+        elif import_type == 4:
+            self.description.text = ('Data must be in the format, "Account Number, Account Name, Budget holder Name, '
+                                     'Budgetholder email, Sysadmin Name, Sysadmin Email, Finance Code, Task Code", '
+                                     'with one account per line.')
+            self.date_pick_grid.set_visibility(False)
+            self.gross_toggle.set_visibility(False)
 
     def import_data(self, event: nicegui.events.ClickEventArguments):
-        import_type = self.import_type.value
-        if import_type == 1:
-            self.import_transactions()
-        elif import_type == 2:
-            self.import_exchange_rate()
-
-    def import_exchange_rate(self):
         data = self.import_textbox.value
         if not data:
             ui.notify("No data to import.")
             return 0
+
+        import_type = self.import_type.value
+        if import_type == 1:
+            self.import_month_transactions(data)
+        if import_type == 2:
+            self.import_account_transactions(data)
+        elif import_type == 3:
+            self.import_exchange_rate(data)
+        elif import_type == 4:
+            self.import_account_details(data)
+
+    def import_exchange_rate(self, data: str):
         data = data.split("\n")
 
         for index, line in enumerate(data):
@@ -75,11 +96,7 @@ class UIImport:
         self.parent.settings.ui_exchange_rate.populate_exchange_rate_grid()
         ui.notify("Exchange rates imported.")
 
-    def import_transactions(self):
-        data = self.import_textbox.value
-        if not data:
-            ui.notify("No data to import.")
-            return 0
+    def import_month_transactions(self, data: str):
         data = data.split("\n")
 
         valid_account_numbers = [account.id for account in Account.select(Account.id)]
@@ -107,15 +124,15 @@ class UIImport:
                 ui.notify(f"Malformed data on line {index} - wrong number of fields.")
                 return 0
             if len(line[0]) != 12:
-                ui.notify(f"Malformed account number on line {index} - must be 12 characters")
+                ui.notify(f"Malformed account number on line {index + 1} - must be 12 characters")
                 return 0
             if line[0] not in valid_account_numbers:
-                ui.notify(f"Account number {line[0]} at line {index} not found in database.")
+                ui.notify(f"Account number {line[0]} at line {index + 1} not found in database.")
                 return 0
             try:
                 decimal.Decimal(line[-1])
             except decimal.InvalidOperation:
-                ui.notify(f"Malformed transaction amount on line {index} - unable to convert to Decimal")
+                ui.notify(f"Malformed transaction amount on line {index + 1} - unable to convert to Decimal")
                 return 0
             processed_lines.append(line)
         ui.notify("Data is valid.")
@@ -135,3 +152,87 @@ class UIImport:
 
         self.parent.transactions.update_transaction_grid()
         ui.notify("Transactions added to accounts.")
+
+    def import_account_transactions(self, data: str):
+        data = data.split("\n")
+
+        valid_account_numbers = [account.id for account in Account.select(Account.id)]
+
+        account_number = data.pop(0)
+        if len(account_number) != 12:
+            ui.notify(f"Malformed account number on line 1 - must be 12 characters")
+            return 0
+        if account_number not in valid_account_numbers:
+            ui.notify(f"Account number {account_number} at line 1 not found in database.")
+            return 0
+
+        for index, line in enumerate(data):
+            line = line.split("\t")
+            date = datetime.datetime.strptime(line[0], "%b-%y").date()
+            try:
+                amount = decimal.Decimal(line[1])
+            except decimal.InvalidOperation:
+                ui.notify(f"Malformed amount on line {index}")
+                return 0
+            transaction = Transaction.get_or_none(account=account_number, date=date, type="Monthly")
+            if not transaction:
+                Transaction.create(account=account_number, date=date, type="Monthly", amount=amount, is_pound=False)
+            else:
+                if self.gross_toggle.value == "Gross":
+                    amount = (amount / decimal.Decimal(1.2))
+                transaction.amount = amount
+                transaction.save()
+        ui.notify("Transactions added.")
+
+    @staticmethod
+    def import_account_details(data: str):
+        data = data.split("\n")
+
+        valid_account_numbers = [account.id for account in Account.select(Account.id)]
+
+        processed_lines = []
+
+        for index, line in enumerate(data):
+            line = line.split("\t")
+            if not line:
+                continue
+            if not line[0]:
+                continue
+            if len(line[0]) != 12:
+                ui.notify(f"Malformed account number on line {index + 1} - must be 12 characters")
+                return 0
+            if line[0] not in valid_account_numbers:
+                ui.notify(f"Account number {line[0]} at line {index + 1} not found in database.")
+                return 0
+            processed_lines.append(line)
+
+        for line in processed_lines:
+            account_id = line[0]
+            account_name = line[1]
+            budget_holder_name = line[2].split()
+            budget_holder_email = line[3]
+            sysadmin_name = line[4].split()
+            sysadmin_email = line[5]
+            finance_code = line[6]
+            task_code = line[7]
+            account: Account = Account.get(Account.id==account_id)
+            account.name = account_name
+            account.finance_code = finance_code
+            account.task_code = task_code
+
+            if budget_holder_name:
+                budget_holder = Person.get_or_create(first_name=budget_holder_name[0], last_name=budget_holder_name[1],
+                                                     email=budget_holder_email)[0]
+                account.budget_holder = budget_holder.id
+            else:
+                account.budget_holder = None
+
+            for sysadmin in account.sysadmin:
+                sysadmin.delete_instance()
+            if sysadmin_name:
+                sysadmin = Person.get_or_create(first_name=sysadmin_name[0], last_name=sysadmin_name[1],
+                                                email=sysadmin_email)[0]
+                Sysadmin.create(account=account_id, person=sysadmin.id)
+
+            account.save()
+        ui.notify("Account details imported.")
