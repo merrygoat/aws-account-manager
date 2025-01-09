@@ -79,8 +79,9 @@ class UIAccountDetails:
             selected_sysadmin = Person.get(Person.id == selected_sysadmin)
             Sysadmin.create(person=selected_sysadmin, account=account)
         else:
-            sysadmin = Sysadmin.get(Sysadmin.account == account.id)
-            sysadmin.delete_instance()
+            sysadmin = Sysadmin.get_or_none(Sysadmin.account == account.id)
+            if sysadmin:
+                sysadmin.delete_instance()
         selected_budget_holder = self.budget_holder.value
         if selected_budget_holder:
             selected_budget_holder = Person.get(Person.id == selected_budget_holder)

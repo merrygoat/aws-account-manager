@@ -154,7 +154,7 @@ class Transaction(BaseModel):
     account = peewee.ForeignKeyField(Account, backref="transactions")
     type = peewee.CharField()  # ["Monthly", "Pre-pay", "Savings plan", "Adjustment"]
     date: datetime.date = peewee.DateField()
-    amount: Decimal = peewee.DecimalField(null=True)
+    amount: Decimal = peewee.DecimalField(null=True)  # The net value of the transaction
     is_pound = peewee.BooleanField()
     _exchange_rate: Decimal = peewee.DecimalField(null=True)   # USD/GBP
     recharge_request = peewee.ForeignKeyField(RechargeRequest, backref="transactions", null=True)
@@ -165,11 +165,11 @@ class Transaction(BaseModel):
         if self.is_pound:
             # Accounts are settled in pounds so there is no reason to convert a pound transaction to a dollar value
             transaction.update({"currency": "£", "support_charge": "-", "shared_charge": "-",
-                                "total_pound": self.total_pound})
+                                "total_pound": self.gross_total_pound})
         else:
             transaction.update({"currency": "$", "support_charge": self.support_charge,
                                 "shared_charge": self.shared_charges, "exchange_rate": self.exchange_rate,
-                                "total_dollar": self.total_dollar, "total_pound": self.total_pound})
+                                "gross_total_dollar": self.gross_total_dollar, "gross_total_pound": self.gross_total_pound})
 
         if self.recharge_request:
             transaction["recharge_reference"] = self.recharge_request.reference
@@ -238,22 +238,22 @@ class Transaction(BaseModel):
         return total
 
     @property
-    def total_dollar(self) -> Decimal | None:
-        """Calculate the total cost for the month."""
+    def gross_total_dollar(self) -> Decimal | None:
+        """Calculate the total cost for the month, adding 20% for VAT."""
         if self.amount is None or self.amount_dollar is None:
             return None
         else:
-            return self.amount_dollar + self.support_charge + self.shared_charges
+            return (self.amount_dollar + self.support_charge + self.shared_charges) * Decimal(1.2)
 
     @property
-    def total_pound(self) -> Decimal | None:
-        """Calculate the total cost of the transaction."""
+    def gross_total_pound(self) -> Decimal | None:
+        """Calculate the total cost of the transaction, converting from dollars."""
         if self.is_pound:
             return self.amount
-        if self.total_dollar is None:
+        if self.gross_total_dollar is None:
             return None
         else:
-            return  self.total_dollar * self.exchange_rate
+            return  self.gross_total_dollar * self.exchange_rate
 
 
 class SharedCharge(BaseModel):

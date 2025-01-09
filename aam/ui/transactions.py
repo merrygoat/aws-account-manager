@@ -28,15 +28,15 @@ class UITransactions:
                            {"headerName": "Type", "field": "type"},
                            {"headerName": "Currency", "field": "currency", "editable": True,
                             "valueFormatter": "value.toFixed(2)"},
-                           {"headerName": "Amount (£)", "field": "amount", "editable": True,
+                           {"headerName": "Net Amount", "field": "amount", "editable": True,
                             "valueFormatter": "value.toFixed(2)"},
-                           {"headerName": "Support Charge ($)", "field": "support_charge",
+                           {"headerName": "Net Support Charge ($)", "field": "support_charge",
                             "valueFormatter": "value.toFixed(2)"},
-                           {"headerName": "Shared Charges ($)", "field": "shared_charge",
+                           {"headerName": "Net Shared Charges ($)", "field": "shared_charge",
                             "valueFormatter": "value.toFixed(2)"},
-                           {"headerName": "Total ($)", "field": "total_dollar",
+                           {"headerName": "Gross Total ($)", "field": "gross_total_dollar",
                             "valueFormatter": "value.toFixed(2)"},
-                           {"headerName": "Total (£)", "field": "total_pound",
+                           {"headerName": "Gross Total (£)", "field": "gross_total_pound",
                             "valueFormatter": "value.toFixed(2)"},
                            {"headerName": "Recharge Reference", "field": "recharge_reference"}],
             'rowData': {},
@@ -197,7 +197,7 @@ class UIRechargeRequests:
         for account_number, transactions in transaction_dict.items():
             total = Decimal(0)
             for transaction in transactions:
-                total += transaction.total_pound()
+                total += transaction.gross_total_pound()
             total = round(total, 2)
             account = transactions[0].account
             export_string += f"{account_number}, {account.name}, {account.budget_holder.first_name}, {account.budget_holder.email}, , {account.finance_code}, {account.task_code}, {total}\n"
@@ -223,8 +223,7 @@ class UIRequestItems:
             'stopEditingWhenCellsLoseFocus': True,
         })
         with ui.row():
-            self.add_to_recharge_request_button = ui.button("Add selected transactions to request",
-                                                            on_click=self.add_transaction_to_request)
+            self.add_to_recharge_request_button = ui.button("Add selected transactions to request", on_click=self.add_transaction_to_request)
             self.remove_recharge_button = ui.button("Remove selected transactions from request", on_click=self.remove_transaction_from_request)
 
     def update_request_items_grid(self, request_id: int | None):
@@ -237,19 +236,19 @@ class UIRequestItems:
         recharges_list = []
         for transaction in transactions:
             recharges_list.append({"transaction_id": transaction.id, "account_name": f"{transaction.account.name} - {transaction.account}",
-                                   "date": transaction.date, "type": transaction.type, "recharge_amount": transaction.total_pound})
+                                   "date": transaction.date, "type": transaction.type, "recharge_amount": transaction.gross_total_pound})
         self.request_items_grid.options["rowData"] = recharges_list
         self.request_items_grid.update()
 
     async def add_transaction_to_request(self, event: nicegui.events.ClickEventArguments):
         selected_request_row = await(self.parent.ui_recharge_requests.recharge_request_grid.get_selected_row())
-        if selected_request_row is None:
+        if not selected_request_row:
             ui.notify("No recharge request selected")
             return 0
         selected_recharge_id = selected_request_row["id"]
 
         selected_transaction_rows = await(self.parent.parent.transactions.get_selected_rows())
-        if selected_transaction_rows is None:
+        if not selected_transaction_rows:
             ui.notify("No transactions selected")
             return 0
 
