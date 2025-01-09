@@ -43,8 +43,8 @@ class UIImport:
             self.date_pick_grid.set_visibility(True)
             self.gross_toggle.set_visibility(False)
         elif import_type == 2:
-            self.description.text = ('Data must be in the format, "Month-year, amount ($)", with one month per line'
-                                     'and the account number on its own on the first line.')
+            self.description.text = ('Data must be tab delimited in the format, "Month-year   amount ($)", with one '
+                                     'month per line and the account number on its own on the first line.')
             self.date_pick_grid.set_visibility(False)
             self.gross_toggle.set_visibility(True)
         elif import_type == 3:
@@ -166,14 +166,31 @@ class UIImport:
             ui.notify(f"Account number {account_number} at line 1 not found in database.")
             return 0
 
+        # Check all lines for validity before adding anything to the database.
+        processed_lines = []
         for index, line in enumerate(data):
+            # Ignore any blank lines
+            if not line:
+                continue
             line = line.split("\t")
-            date = datetime.datetime.strptime(line[0], "%b-%y").date()
+            # Remove any thousands comma delimiters
+            line[1] = line[1].replace(",", "")
             try:
-                amount = decimal.Decimal(line[1])
-            except decimal.InvalidOperation:
-                ui.notify(f"Malformed amount on line {index}")
+                datetime.datetime.strptime(line[0], "%b-%y").date()
+            except ValueError:
+                ui.notify(f"Malformed date on line {index + 1}")
                 return 0
+            try:
+                decimal.Decimal(line[1])
+            except decimal.InvalidOperation:
+                ui.notify(f"Malformed amount on line {index + 1}")
+                return 0
+            processed_lines.append(line)
+
+        for line in processed_lines:
+            date = datetime.datetime.strptime(line[0], "%b-%y").date()
+            amount = decimal.Decimal(line[1])
+
             transaction = Transaction.get_or_none(account=account_number, date=date, type="Monthly")
             if not transaction:
                 Transaction.create(account=account_number, date=date, type="Monthly", amount=amount, is_pound=False)
@@ -182,6 +199,9 @@ class UIImport:
                     amount = (amount / decimal.Decimal(1.2))
                 transaction.amount = amount
                 transaction.save()
+        # If the account being imported to is currently visible then update the transactions grid.
+        if self.parent.get_selected_account_id() == account_number:
+            self.parent.transactions.update_transaction_grid()
         ui.notify("Transactions added.")
 
     @staticmethod

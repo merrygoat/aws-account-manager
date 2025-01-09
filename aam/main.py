@@ -30,7 +30,7 @@ def main():
 class UIMainForm:
     def __init__(self):
         self._selected_organization_id: Optional[str] = None
-        self._selected_account: Optional[Account] = None
+        self._selected_account_id: Optional[int] = None
 
         with ui.row().classes('w-full place-content-center'):
             self.account_select = UIAccountSelect(self)
@@ -73,11 +73,14 @@ class UIMainForm:
     def get_selected_organization_id(self) -> Optional[str]:
         return self._selected_organization_id
 
-    def set_selected_account(self, account: Account | None):
-        self._selected_account = account
+    def set_selected_account_id(self, account: Account | None):
+        if account:
+            self._selected_account_id = account.id
+        else:
+            self._selected_account_id = None
 
-    def get_selected_account(self) -> Optional[Account]:
-        return self._selected_account
+    def get_selected_account_id(self) -> int | None:
+        return self._selected_account_id
 
 
 main()

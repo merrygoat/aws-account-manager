@@ -58,16 +58,16 @@ class UITransactions:
 
     def initialize(self, account: Account | None):
         """This function is run when an account is selected from the dropdown menu."""
-        if account is not None and account.creation_date:
+        if account is not None:
             self.update_transaction_grid()
 
     def add_new_transaction(self):
-        account = self.parent.get_selected_account()
-        if account is None:
+        account_id = self.parent.get_selected_account_id()
+        if account_id is None:
             ui.notify("No account selected to add transaction")
             return 0
 
-        self.new_transaction_dialog.open(account)
+        self.new_transaction_dialog.open(account_id)
 
     async def delete_selected_transaction(self, event: nicegui.events.ClickEventArguments):
         selected_rows = await(self.get_selected_rows())
@@ -89,12 +89,12 @@ class UITransactions:
                 self.ui_request_items.update_request_items_grid(selected_request_row["id"])
             ui.notify("Transaction deleted.")
 
-
     def update_transaction_grid(self):
-        account = self.parent.get_selected_account()
-        if account is None:
+        account_id = self.parent.get_selected_account_id()
+        if account_id is None:
             row_data = []
         else:
+            account = Account.get(Account.id == account_id)
             row_data = account.get_transactions()
         self.transaction_grid.options["rowData"] = row_data
         self.transaction_grid.update()
@@ -287,7 +287,7 @@ class UIRequestItems:
 class UINewSingleTransactionDialog:
     def __init__(self, parent: UITransactions):
         self.parent = parent
-        self.selected_account: Account | None = None
+        self.selected_account_id: int | None = None
 
         with ui.dialog() as self.dialog:
             with ui.card():
@@ -307,8 +307,8 @@ class UINewSingleTransactionDialog:
                     ui.button("Cancel", on_click=self.dialog.close)
         self.set_currency(True)
 
-    def open(self, account: Account):
-        self.selected_account = account
+    def open(self, account_id: int):
+        self.selected_account_id = account_id
         self.dialog.open()
 
     def new_transaction(self):
@@ -335,7 +335,7 @@ class UINewSingleTransactionDialog:
             exchange_rate = None
             is_pound = True
 
-        Transaction.create(account=self.selected_account.id, type=self.type.value, date=self.date_input.value,
+        Transaction.create(account=self.selected_account_id, type=self.type.value, date=self.date_input.value,
                            amount=amount, is_pound=is_pound, _exchange_rate=exchange_rate)
         self.parent.update_transaction_grid()
         ui.notify("New transaction added.")

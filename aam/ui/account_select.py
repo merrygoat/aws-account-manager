@@ -66,7 +66,7 @@ class UIAccountSelect:
         account = Account.get_or_none(Account.id == selected_account_id)
 
         self.parent.account_details.update(account)
-        self.parent.set_selected_account(account)
+        self.parent.set_selected_account_id(account)
         self.parent.transactions.initialize(account)
         self.parent.notes.update_note_grid()
 

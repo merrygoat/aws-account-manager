@@ -29,14 +29,14 @@ class UIAccountNotes:
             ui.button('Edit note', on_click=self.edit_note_button_press)
 
     def add_note_button_press(self, event: nicegui.events.ClickEventArguments):
-        selected_account = self.parent.get_selected_account()
-        if selected_account is not None:
-            self.add_note_dialog.open(selected_account)
+        selected_account_id = self.parent.get_selected_account_id()
+        if selected_account_id is not None:
+            self.add_note_dialog.open(selected_account_id)
         else:
             ui.notify("No account selected to add note.")
 
     async def edit_note_button_press(self, event: nicegui.events.ClickEventArguments):
-        selected_account = self.parent.get_selected_account()
+        selected_account = self.parent.get_selected_account_id()
         if selected_account is not None:
             note_row = await(self.notes_grid.get_selected_row())
             if note_row:
@@ -47,13 +47,13 @@ class UIAccountNotes:
             ui.notify("No account selected to edit note.")
 
     def update_note_grid(self):
-        account = self.parent.get_selected_account()
+        account_id = self.parent.get_selected_account_id()
 
-        if account is None:
+        if account_id is None:
             self.clear()
             return 0
 
-        notes = [note for note in Note.select().where(Note.account == account.id)]
+        notes = [note for note in Note.select().where(Note.account == account_id)]
         if notes:
             notes = [{"id": note.id, "date": note.date, "text": note.text} for note in notes]
         else:
@@ -69,7 +69,7 @@ class UIAccountNotes:
 class AddNoteDialog:
     def __init__(self, parent: "UIAccountNotes"):
         self.parent = parent
-        self.selected_account: Account | None = None
+        self.selected_account_id: int | None = None
 
         with ui.dialog() as self.dialog:
             with ui.card():
@@ -92,13 +92,13 @@ class AddNoteDialog:
     def save_new_note(self, event: nicegui.events.ClickEventArguments):
         date = self.date.value
         text = self.text.value
-        Note.create(date=date, text=text, account=self.selected_account.id)
+        Note.create(date=date, text=text, account=self.selected_account_id)
         self.close()
         self.parent.update_note_grid()
         ui.notify("New Note saved.")
 
-    def open(self, selected_account: Account):
-        self.selected_account = selected_account
+    def open(self, selected_account: int):
+        self.selected_account_id = selected_account
         self.dialog.open()
 
     def close(self):
