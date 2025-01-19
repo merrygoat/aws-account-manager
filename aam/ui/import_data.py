@@ -26,11 +26,9 @@ class UIImport:
             ui.label("Year")
             self.month = month_select()
             self.year = year_select()
-        self.gross_toggle = ui.radio(["Net", "Gross"], value="Net").props('inline')
         self.import_textbox = ui.textarea("Raw data").classes("w-1/2")
         self.import_button = ui.button("Import data", on_click=self.import_data)
 
-        self.gross_toggle.set_visibility(False)
 
     'Data must be in the format: "account number, transaction amount" with one account per line. '
     'Comma is the only valid field separator.'
@@ -41,23 +39,21 @@ class UIImport:
             self.description.text = ('Data must be in the format: "account number, transaction amount" with one account '
                                      'per line. Comma or tab can be use as field separators.')
             self.date_pick_grid.set_visibility(True)
-            self.gross_toggle.set_visibility(False)
         elif import_type == 2:
             self.description.text = ('Data must be tab delimited in the format, "Month-year   amount ($)", with one '
                                      'month per line and the account number on its own on the first line.')
+            self.description.text = ('Data before 01/07/24 is imported as gross values and after this date as net '
+                                     'values.')
             self.date_pick_grid.set_visibility(False)
-            self.gross_toggle.set_visibility(True)
         elif import_type == 3:
             self.description.text = ('Data must be in the format, "Month-year, exchange_rate", with one month per line.'
                                      'e.g "Mar-23, 0.756473".')
             self.date_pick_grid.set_visibility(False)
-            self.gross_toggle.set_visibility(False)
         elif import_type == 4:
             self.description.text = ('Data must be in the format, "Account Number, Account Name, Budget holder Name, '
                                      'Budgetholder email, Sysadmin Name, Sysadmin Email, Finance Code, Task Code", '
                                      'with one account per line.')
             self.date_pick_grid.set_visibility(False)
-            self.gross_toggle.set_visibility(False)
 
     def import_data(self, event: nicegui.events.ClickEventArguments):
         data = self.import_textbox.value
@@ -195,7 +191,8 @@ class UIImport:
             if not transaction:
                 Transaction.create(account=account_number, date=date, type="Monthly", amount=amount, is_pound=False)
             else:
-                if self.gross_toggle.value == "Gross":
+                # AWS data from the API comes as gross totals while the breakdowns from Strategic Blue are net.
+                if date < datetime.date(2024, 7, 1):
                     amount = (amount / decimal.Decimal(1.2))
                 transaction.amount = amount
                 transaction.save()

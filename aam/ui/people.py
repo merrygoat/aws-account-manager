@@ -16,7 +16,7 @@ class UIPeople:
         self.new_person_dialog = AddPersonDialog(self)
 
         with ui.row().classes('w-full no-wrap'):
-            with ui.column().classes('w-1/4'):
+            with ui.column().classes('w-1/3'):
                 ui.html("Person details").classes("text-2xl")
                 self.person_select = ui.select(options=[], label="Person", on_change=self.show_person_details).classes("min-w-[400px]").props('popup-content-class="!max-h-[500px]"')
                 with ui.grid(columns="auto auto"):
