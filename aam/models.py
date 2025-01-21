@@ -222,7 +222,7 @@ class Transaction(BaseModel):
     def support_charge(self) -> Decimal:
         """If the transaction needs to be charged for support, return the amount in dollars."""
         if self.support_eligible and self.amount_dollar:
-            return self.amount_dollar * Decimal(0.1)
+            return (self.amount_dollar + self.shared_charges) * Decimal(0.1)
         else:
             return Decimal(0)
 

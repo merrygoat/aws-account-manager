@@ -21,6 +21,8 @@ class UISharedCharges:
         ui.html("Shared Charges").classes("text-2xl")
         with ui.row().classes("w-full no-wrap"):
             with ui.column().classes('w-2/3'):
+                ui.label("Values are net values and do not include the support percentage. "
+                         "VAT and the support charge are added automatically in the transaction tab.")
                 self.shared_charges_table = ui.aggrid({
                     'columnDefs': [{"headerName": "id", "field": "id", "hide": True},
                                    {"headerName": "Name", "field": "name"},
