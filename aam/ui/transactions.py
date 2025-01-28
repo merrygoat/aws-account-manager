@@ -197,7 +197,7 @@ class UIRechargeRequests:
         for account_number, transactions in transaction_dict.items():
             total = Decimal(0)
             for transaction in transactions:
-                total += transaction.gross_total_pound()
+                total += transaction.gross_total_pound
             total = round(total, 2)
             account = transactions[0].account
             export_string += f"{account_number}, {account.name}, {account.budget_holder.first_name}, {account.budget_holder.email}, , {account.finance_code}, {account.task_code}, {total}\n"

@@ -109,11 +109,11 @@ class UINewOrganizationDialog:
         self.parent = parent
         with ui.dialog() as self.dialog:
             with ui.card():
-                ui.label("New Organization").classes("text-2xl")
+                ui.label("Add Organization").classes("text-2xl")
                 with ui.grid(columns="auto auto"):
                     ui.label("Organization ID")
                     self.name = ui.input(validation={"Must provide organization ID": lambda value: len(value) > 1})
-                    ui.button("Add", on_click=self.new_organization)
+                    ui.button("Add", on_click=self.add_organization)
                     ui.button("Cancel", on_click=self.dialog.close)
 
     def open(self):
@@ -122,11 +122,12 @@ class UINewOrganizationDialog:
     def close(self):
         self.dialog.close()
 
-    def new_organization(self, event: nicegui.events.ClickEventArguments):
+    def add_organization(self, event: nicegui.events.ClickEventArguments):
         if self.name.value != "":
             Organization.create(id=self.name.value)
             ui.notify("New organization added")
             self.parent.populate_org_grid()
+            self.parent.parent.parent.account_select.update_organization_select_options()
             self.close()
         else:
             ui.notify("Must provide an organization name")

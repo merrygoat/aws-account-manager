@@ -71,6 +71,11 @@ class UIAccountSelect:
         self.parent.notes.update_note_grid()
 
     async def update_account_info(self):
+        selected_organization = self.organization_select.value
+        if not selected_organization:
+            ui.notify("No organization selected.")
+            return 0
+
         with ui.dialog() as loadingDialog:
             ui.spinner(size='10em', color='black')
         loadingDialog.open()
@@ -84,7 +89,7 @@ class UIAccountSelect:
             text = "None"
         else:
             last_account_update = LastAccountUpdate.get_or_create(organization=organization_id)[0]
-            if last_account_update:
+            if last_account_update.time:
                 text = last_account_update.time.strftime('%d/%m/%y, %H:%M:%S')
             else:
                 text = "None"
