@@ -58,8 +58,6 @@ class UIAccountSelect:
         selected_org_id = event.sender.value
         self.update_account_select_options()
         self.parent.set_selected_organization_id(selected_org_id)
-        self.parent.shared_charges.populate_shared_charges_table()
-        self.update_last_updated_label(selected_org_id)
 
     def account_selected(self, event: nicegui.events.ValueChangeEventArguments):
         selected_account_id = event.sender.value
@@ -97,8 +95,9 @@ class UIAccountSelect:
 
     def select_default_org(self):
         # Get the id of the first org in the dict
-        first_org = next(iter(self.organization_select.options))
-        self.organization_select.set_value(first_org)
+        if self.organization_select.options:
+            first_org = next(iter(self.organization_select.options))
+            self.organization_select.set_value(first_org)
 
 
 def get_and_process_account_info(org_id: str):
