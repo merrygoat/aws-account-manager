@@ -48,11 +48,7 @@ class UIMainForm:
             with splitter.after:
                 with ui.tab_panels(tabs, value=self.accounts_tab).props('vertical').classes('w-full h-full'):
                     with ui.tab_panel(self.accounts_tab):
-                        with ui.row().classes('w-full no-wrap'):
-                            with ui.column().classes('w-1/2'):
-                                self.account_details = UIAccountDetails(self)
-                            with ui.column().classes('w-1/2'):
-                                self.notes = UIAccountNotes(self)
+                        self.account_details = UIAccountDetails(self)
                     with ui.tab_panel(self.transactions_tab):
                         self.transactions = UITransactions(self)
                     with ui.tab_panel(self.shared_charges_tab):

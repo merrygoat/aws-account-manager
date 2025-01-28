@@ -4,14 +4,14 @@ from typing import TYPE_CHECKING
 import nicegui.events
 from nicegui import ui
 
-from aam.models import Note, Account
+from aam.models import Note
 
 if TYPE_CHECKING:
-    from aam.main import UIMainForm
+    from aam.main import UIAccountDetails
 
 
 class UIAccountNotes:
-    def __init__(self, parent: "UIMainForm"):
+    def __init__(self, parent: "UIAccountDetails"):
         self.parent = parent
         ui.html("Notes").classes("text-xl")
         self.notes_grid = ui.aggrid({
@@ -29,14 +29,14 @@ class UIAccountNotes:
             ui.button('Edit note', on_click=self.edit_note_button_press)
 
     def add_note_button_press(self, event: nicegui.events.ClickEventArguments):
-        selected_account_id = self.parent.get_selected_account_id()
+        selected_account_id = self.parent.parent.get_selected_account_id()
         if selected_account_id is not None:
             self.add_note_dialog.open(selected_account_id)
         else:
             ui.notify("No account selected to add note.")
 
     async def edit_note_button_press(self, event: nicegui.events.ClickEventArguments):
-        selected_account = self.parent.get_selected_account_id()
+        selected_account = self.parent.parent.get_selected_account_id()
         if selected_account is not None:
             note_row = await(self.notes_grid.get_selected_row())
             if note_row:
@@ -47,7 +47,7 @@ class UIAccountNotes:
             ui.notify("No account selected to edit note.")
 
     def update_note_grid(self):
-        account_id = self.parent.get_selected_account_id()
+        account_id = self.parent.parent.get_selected_account_id()
 
         if account_id is None:
             self.clear()

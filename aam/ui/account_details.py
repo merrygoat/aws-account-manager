@@ -1,11 +1,12 @@
 import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Iterable
 
 import nicegui.events
 from nicegui import ui
 
 import aam.utilities
-from aam.models import Account, Person, Sysadmin
+from aam.models import Account, Person, Sysadmin, Organization
+from aam.ui.notes import UIAccountNotes
 
 if TYPE_CHECKING:
     from aam.main import UIMainForm
@@ -15,42 +16,78 @@ class UIAccountDetails:
     def __init__(self, parent: "UIMainForm"):
         self.parent = parent
 
-        ui.html("Account Details").classes("text-2xl")
-        with ui.grid(columns='auto 1fr').classes('w-full'):
-            ui.label("Name:")
-            self.account_name = ui.label("")
-            ui.label("Account ID:")
-            self.account_id = ui.label("")
-            ui.label("Root Email:")
-            self.root_email = ui.label("")
-            ui.label("Account Status:")
-            self.account_status = ui.label("")
-            ui.html("Billing/Contact Details").classes("text-2xl")
-            ui.element()
-            ui.label("Budget Holder:")
-            self.budget_holder = ui.select([], on_change=self.update_budget_holder_email).props("clearable")
-            ui.label("Budget Holder email:")
-            self.budget_holder_email = ui.label("")
-            ui.label("Finance Code:")
-            self.finance_code = ui.input().props("clearable")
-            ui.label("Task Code:")
-            self.task_code = ui.input().props("clearable")
-            ui.label("Sysadmin:")
-            self.sysadmin = ui.select([], on_change=self.update_sysadmin_email).props("clearable")
-            ui.label("Sysadmin email:")
-            self.sysadmin_email = ui.label("")
-            ui.label("Creation date")
-            self.account_creation_input = aam.utilities.date_picker()
-            ui.label("Closure date")
-            self.account_closure_input = aam.utilities.date_picker()
-        with ui.column().classes("items-end w-full"):
-            self.save_changes = ui.button("Save Changes", on_click=self.save_account_changes)
+        with ui.tabs().props("align left").classes('w-full') as tabs:
+            tab_one = ui.tab("Account Details")
+            tab_two = ui.tab("Account List")
 
-        self.budget_holder.disable()
-        self.sysadmin.disable()
-        self.finance_code.disable()
-        self.task_code.disable()
-        self.save_changes.disable()
+        with ui.tab_panels(tabs, value=tab_one).classes('w-full'):
+            with ui.tab_panel(tab_one):
+                with ui.row().classes('w-full no-wrap'):
+                    with ui.column().classes('w-1/2'):
+                        ui.html("Account Details").classes("text-2xl")
+                        with ui.grid(columns='auto 1fr').classes('w-full'):
+                            ui.label("Name:")
+                            self.account_name = ui.label("")
+                            ui.label("Account ID:")
+                            self.account_id = ui.label("")
+                            ui.label("Root Email:")
+                            self.root_email = ui.label("")
+                            ui.label("Account Status:")
+                            self.account_status = ui.label("")
+                            ui.html("Billing/Contact Details").classes("text-2xl")
+                            ui.element()
+                            ui.label("Budget Holder:")
+                            self.budget_holder = ui.select([], on_change=self.update_budget_holder_email).props("clearable")
+                            ui.label("Budget Holder email:")
+                            self.budget_holder_email = ui.label("")
+                            ui.label("Finance Code:")
+                            self.finance_code = ui.input().props("clearable")
+                            ui.label("Task Code:")
+                            self.task_code = ui.input().props("clearable")
+                            ui.label("Sysadmin:")
+                            self.sysadmin = ui.select([], on_change=self.update_sysadmin_email).props("clearable")
+                            ui.label("Sysadmin email:")
+                            self.sysadmin_email = ui.label("")
+                            ui.label("Creation date")
+                            self.account_creation_input = aam.utilities.date_picker()
+                            ui.label("Closure date")
+                            self.account_closure_input = aam.utilities.date_picker()
+                        with ui.column().classes("items-end w-full"):
+                            self.save_changes = ui.button("Save Changes", on_click=self.save_account_changes)
+                    with ui.column().classes('w-1/3'):
+                        self.notes = UIAccountNotes(self)
+            with ui.tab_panel(tab_two):
+                ui.html("Account List").classes("text-2xl")
+                self.account_grid = ui.aggrid({
+                    'defaultColDef': {"suppressMovable": True},
+                    'columnDefs': [{"headerName": "id", "field": "id"},
+                                   {"headerName": "Organization", "field": "organization", "sort": "asc", "sortIndex": 0},
+                                   {"headerName": "Name", "field": "name", "sort": "asc", "sortIndex": 1},
+                                   {"headerName": "Status", "field": "status"},
+                                   {"headerName": "Budget Holder", "field": "budget_holder"},
+                                   {"headerName": "Finance Code", "field": "finance_code"},
+                                   {"headerName": "Task Code", "field": "task_code"}],
+                    'rowData': {},
+                })
+
+        self.clear_account_details()
+
+    def populate_account_list(self, org_id: str | None):
+        account_details = []
+
+        if org_id:
+            accounts: Iterable[Account] = (Account.select().where(Account.organization == org_id)
+                                           .join_from(Account, Person)
+                                           .join_from(Account, Organization))
+            for account in accounts:
+                details = ({"id": account.id, "name": account.name, "organization": account.organization.name,
+                            "status": account.status, "finance_code": account.finance_code,
+                            "task_code": account.task_code})
+                if account.budget_holder:
+                    details["budget_holder"] = f"{account.budget_holder.first_name} {account.budget_holder.last_name}"
+                account_details.append(details)
+
+        self.account_grid.options["rowData"] = account_details
 
     def save_account_changes(self):
         account: Account = Account.get(Account.id == self.account_id.text)
@@ -111,7 +148,7 @@ class UIAccountDetails:
         else:
             self.budget_holder_email.set_text("")
 
-    def clear(self):
+    def clear_account_details(self):
         self.account_name.set_text("")
         self.account_id.set_text("")
         self.root_email.set_text("")
@@ -127,11 +164,11 @@ class UIAccountDetails:
         self.budget_holder.disable()
         self.sysadmin.disable()
         self.save_changes.disable()
-        self.parent.notes.clear()
+        self.notes.clear()
 
     def update(self, account: Account | None):
         if account is None:
-            self.clear()
+            self.clear_account_details()
             return 0
 
         self.sysadmin.enable()
