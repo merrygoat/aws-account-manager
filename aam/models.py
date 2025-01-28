@@ -94,6 +94,7 @@ class Account(BaseModel):
         else:
             return datetime.date.today()
 
+
 class Sysadmin(BaseModel):
     id = peewee.AutoField()
     person = peewee.ForeignKeyField(Person, backref="sysadmin")
@@ -115,8 +116,7 @@ class Note(BaseModel):
     account = peewee.ForeignKeyField(Account, backref="notes")
 
 class Month(BaseModel):
-    id = peewee.AutoField()
-    month_code: int = peewee.IntegerField()
+    month_code: int = peewee.IntegerField(primary_key=True)
     exchange_rate: Decimal = peewee.DecimalField()
     shared_charges: Iterable["SharedCharge"]  # backref
 
@@ -228,10 +228,10 @@ class Transaction(BaseModel):
 
     @property
     def shared_charges(self) -> decimal.Decimal:
-        if self.account.id is None or self.month.id is None:
+        if self.account.id is None or self.month.month_code is None:
             raise ValueError("Calculation of shared charges failed due to missing data.")
         total = decimal.Decimal(0)
-        charges = (SharedCharge.select().where((AccountJoinSharedCharge.account == self.account.id) & (SharedCharge.month == self.month.id))
+        charges = (SharedCharge.select().where((AccountJoinSharedCharge.account == self.account.id) & (SharedCharge.month == self.month.month_code))
                    .join(AccountJoinSharedCharge))
         for charge in charges:
             total += charge.cost_per_account()
@@ -264,7 +264,7 @@ class SharedCharge(BaseModel):
     month = peewee.ForeignKeyField(Month, backref="shared_charges")
 
     def to_dict(self):
-        month = Month.get(Month.id == self.month)
+        month = Month.get(Month.month_code == self.month)
         charges = (SharedCharge.select(Account.name).where(SharedCharge.id == self.id)
                    .join(AccountJoinSharedCharge)
                    .join(Account).dicts())

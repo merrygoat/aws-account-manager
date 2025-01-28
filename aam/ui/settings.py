@@ -1,6 +1,5 @@
 from typing import TYPE_CHECKING
 
-from docutils.nodes import organization
 from nicegui import ui
 import nicegui.events
 
@@ -34,7 +33,7 @@ class UIExchangeRate:
 
         self.month_grid = ui.aggrid({
             "defaultColDef": {"sortable": False},
-            'columnDefs': [{"headerName": "id", "field": "id", "hide": True},
+            'columnDefs': [{"headerName": "id", "field": "month_code", "hide": True},
                            {"headerName": "Month", "field": "month", "cellDataType": "string"},
                            {"headerName": "Exchange rate £/$", "field": "exchange_rate", "editable": True}],
             'rowData': {},
@@ -44,14 +43,14 @@ class UIExchangeRate:
         self.populate_exchange_rate_grid()
 
     def populate_exchange_rate_grid(self):
-        months = [{"id": month.id, "month": str(month), "exchange_rate": month.exchange_rate} for month in Month.select()]
+        months = [{"month_code": month.month_code, "month": str(month), "exchange_rate": month.exchange_rate} for month in Month.select()]
         self.month_grid.options["rowData"] = months
         self.month_grid.update()
 
     @staticmethod
     def update_exchange_rate(event: nicegui.events.GenericEventArguments):
-        month_id = event.args["data"]["id"]
-        month = Month.get(id=month_id)
+        month_code = event.args["data"]["month_code"]
+        month = Month.get(month_code=month_code)
         month.exchange_rate = event.args["data"]["exchange_rate"]
         month.save()
 

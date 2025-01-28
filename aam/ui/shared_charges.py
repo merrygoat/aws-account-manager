@@ -158,10 +158,10 @@ class UISharedChargeDialog:
 
             shared_charge.name = self.name.value
             shared_charge.amount_pound = amount
-            shared_charge.month = month.id
+            shared_charge.month = month.month_code
             shared_charge.save()
         else:
-            shared_charge = SharedCharge.create(name=self.name.value, amount=amount, month=month.id,
+            shared_charge = SharedCharge.create(name=self.name.value, amount=amount, month=month.month_code,
                                                 organization=self.parent.parent.get_selected_organization_id())
             for account_id in self.account_select.value:
                 AccountJoinSharedCharge.create(account=account_id, shared_charge=shared_charge.id)
@@ -183,7 +183,7 @@ class UISharedChargeDialog:
             self.shared_charge_id = shared_charge.id
 
         if mode != "new":
-            month = Month.get(Month.id == shared_charge.month)
+            month = Month.get(Month.month_code == shared_charge.month)
             accounts = (Account.select(Account.id).where(SharedCharge.id == shared_charge.id)
                            .join(AccountJoinSharedCharge)
                            .join(SharedCharge).dicts())
