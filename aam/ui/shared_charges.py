@@ -6,7 +6,7 @@ import nicegui.events
 from nicegui import ui
 
 from aam.models import SharedCharge, Account, Month, AccountJoinSharedCharge
-from aam.utilities import month_select, year_select, month_code
+from aam.utilities import month_select, year_select, month_code, month_to_string
 
 if TYPE_CHECKING:
     from aam.main import UIMainForm
@@ -26,7 +26,7 @@ class UISharedCharges:
                 self.shared_charges_table = ui.aggrid({
                     'columnDefs': [{"headerName": "id", "field": "id", "hide": True},
                                    {"headerName": "Name", "field": "name"},
-                                   {"headerName": "Month", "field": "month", 'sort': 'asc'},
+                                   {"headerName": "Month", "field": "month", 'sort': 'asc', 'valueFormatter': 'value ? ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][new Date(value).getMonth()] + "-" + new Date(value).getFullYear() : "N/A"'},
                                    {"headerName": "Amount ($)", "field": "amount"},
                                    {"headerName": "Accounts", "field": "account_names"}],
                     'rowData': {},

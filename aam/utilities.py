@@ -44,3 +44,7 @@ def month_from_month_code(code: int) -> int:
     if month == 0:
         month = 12
     return month
+
+
+def date_from_month_code(code: int) -> datetime.date:
+    return datetime.date(year_from_month_code(code), month_from_month_code(code), 1)

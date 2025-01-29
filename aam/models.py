@@ -261,17 +261,19 @@ class SharedCharge(BaseModel):
     name = peewee.TextField()
     amount: decimal.Decimal = peewee.DecimalField()
     organization = peewee.ForeignKeyField(Organization, backref="shared_charges")
-    month = peewee.ForeignKeyField(Month, backref="shared_charges")
+    month: Month = peewee.ForeignKeyField(Month, backref="shared_charges")
+    month_id: int  # The actual month primary key value
 
     def to_dict(self):
-        month = Month.get(Month.month_code == self.month)
+        # Use the primary key value to get date rather than the Month object to avoid a lookup
+        month_date = aam.utilities.date_from_month_code(self.month_id)
         charges = (SharedCharge.select(Account.name).where(SharedCharge.id == self.id)
                    .join(AccountJoinSharedCharge)
                    .join(Account).dicts())
         account_names = [charge["name"] for charge in charges]
         account_names = ", ".join(sorted(account_names))
 
-        return {"id": self.id, "name": self.name, "amount": self.amount, "month": str(month),
+        return {"id": self.id, "name": self.name, "amount": self.amount, "month": month_date,
                 "account_names": account_names}
 
     def num_accounts(self) -> int:
