@@ -78,8 +78,9 @@ class UIOrganizations:
         self.populate_org_grid()
 
     def populate_org_grid(self):
-        orgs = [{"id": org.id, "name": org.name} for org in Organization.select()]
-        self.organization_grid.options["rowData"] = orgs
+        orgs = Organization.select()
+        org_details = [{"id": org.id, "name": org.name} for org in orgs]
+        self.organization_grid.options["rowData"] = org_details
         self.organization_grid.update()
 
     @staticmethod
@@ -153,8 +154,9 @@ class UIAddAccountDialog:
                     ui.label("Account Name")
                     self.account_name = ui.input(validation={"Friendly name must be provided": lambda value: len(value) > 0})
                     ui.label("Organization")
-                    organizations = {org.id: org.name for org in Organization.select()}
-                    self.organization = ui.select(options=organizations, validation={"Organization must be selected": lambda value: len(value) > 0})
+                    organizations = Organization.select()
+                    organization_details = {org.id: org.name for org in organizations}
+                    self.organization = ui.select(options=organization_details, validation={"Organization must be selected": lambda value: len(value) > 0})
                     ui.button("Add", on_click=self.add_new_account)
                     ui.button("Cancel", on_click=self.dialog.close)
 
@@ -162,11 +164,16 @@ class UIAddAccountDialog:
         self.dialog.open()
 
     def add_new_account(self, event: nicegui.events.ClickEventArguments):
-        account = Account.get_or_none(id==self.account_id.value)
+        organization = self.organization.value
+        if not organization:
+            ui.notify("Must select organization.")
+            return 0
+        account_id = self.account_id.value.strip()
+        account = Account.get_or_none(id==account_id)
         if account:
             ui.notify("Account with this ID already exists in the database.")
         else:
-            Account.create(id=self.account_id.value, name=self.account_name.value, organization=self.organization.value,
-                           email="-", status="Closed")
-            ui.notify(f"Account {self.account_name.value} added.")
+            name = self.account_name.value.strip()
+            Account.create(id=account_id, name=name, organization=organization, email="-", status="Closed")
+            ui.notify(f"Account {name} added.")
             self.dialog.close()

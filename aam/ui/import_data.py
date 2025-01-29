@@ -99,6 +99,14 @@ class UIImport:
 
         processed_lines = []
 
+        if not self.month.value:
+            ui.notify("Must select month.")
+            return 0
+
+        if not self.year.value:
+            ui.notify("Must select year.")
+            return 0
+
         # Check data validity
         for index, line in enumerate(data):
             # Remove all spaces
