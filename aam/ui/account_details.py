@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Iterable
 
 import nicegui.events
 from nicegui import ui
+from peewee import JOIN
 
 import aam.utilities
 from aam.models import Account, Person, Sysadmin, Organization
@@ -18,7 +19,7 @@ class UIAccountDetails:
 
         with ui.tabs().props("align left").classes('w-full') as tabs:
             tab_one = ui.tab("Account Details")
-            tab_two = ui.tab("Account List")
+            tab_two = ui.tab("Account List").on("click", self.populate_account_list)
 
         with ui.tab_panels(tabs, value=tab_one).classes('w-full'):
             with ui.tab_panel(tab_one):
@@ -36,6 +37,8 @@ class UIAccountDetails:
                             self.account_status = ui.label("")
                             ui.html("Billing/Contact Details").classes("text-2xl")
                             ui.element()
+                            ui.label("Is recharged")
+                            self.is_recharged = ui.switch()
                             ui.label("Budget Holder:")
                             self.budget_holder = ui.select([], on_change=self.update_budget_holder_email).props("clearable")
                             ui.label("Budget Holder email:")
@@ -64,6 +67,7 @@ class UIAccountDetails:
                                    {"headerName": "Organization", "field": "organization", "sort": "asc", "sortIndex": 0},
                                    {"headerName": "Name", "field": "name", "sort": "asc", "sortIndex": 1},
                                    {"headerName": "Status", "field": "status"},
+                                   {"headerName": "Is recharged", "field": "is_recharged"},
                                    {"headerName": "Budget Holder", "field": "budget_holder"},
                                    {"headerName": "Finance Code", "field": "finance_code"},
                                    {"headerName": "Task Code", "field": "task_code"}],
@@ -72,7 +76,9 @@ class UIAccountDetails:
 
         self.clear_account_details()
 
-    def populate_account_list(self, org_id: str | None):
+    def populate_account_list(self):
+        org_id = self.parent.get_selected_organization_id()
+
         account_details = []
 
         if org_id:
@@ -82,7 +88,7 @@ class UIAccountDetails:
             for account in accounts:
                 details = ({"id": account.id, "name": account.name, "organization": account.organization.name,
                             "status": account.status, "finance_code": account.finance_code,
-                            "task_code": account.task_code})
+                            "task_code": account.task_code, "is_recharged": account.is_recharged})
                 if account.budget_holder:
                     details["budget_holder"] = f"{account.budget_holder.first_name} {account.budget_holder.last_name}"
                 account_details.append(details)
@@ -110,6 +116,8 @@ class UIAccountDetails:
                 ui.notify(f"Account closure date is not valid: {e.args[0]}")
             else:
                 account.closure_date = account_closure_date
+
+        account.is_recharged = self.is_recharged.value
 
         selected_sysadmin = self.sysadmin.value
         if selected_sysadmin:
@@ -182,6 +190,7 @@ class UIAccountDetails:
         self.root_email.set_text(account.email)
         self.account_status.set_text(account.status)
 
+        self.is_recharged.set_value(account.is_recharged)
         all_people = {person.id: person.full_name for person in Person.select()}
         self.budget_holder.set_options(all_people)
         self.sysadmin.set_options(all_people)

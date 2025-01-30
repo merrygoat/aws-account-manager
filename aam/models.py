@@ -55,6 +55,7 @@ class Account(BaseModel):
     task_code = peewee.CharField(null=True)
     creation_date: datetime.date = peewee.DateField(null=True)
     closure_date: datetime.date = peewee.DateField(null=True)
+    is_recharged: bool = peewee.BooleanField(default=True)
     sysadmin: Iterable["Sysadmin"]  # backref
     notes: Iterable["Note"]  # backref
     transactions: Iterable["Transaction"]  # backref

@@ -6,7 +6,7 @@ import nicegui.events
 from nicegui import ui
 
 from aam.models import SharedCharge, Account, Month, AccountJoinSharedCharge
-from aam.utilities import month_select, year_select, month_code, month_to_string
+from aam.utilities import month_select, year_select, month_code
 
 if TYPE_CHECKING:
     from aam.main import UIMainForm

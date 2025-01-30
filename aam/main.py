@@ -67,7 +67,7 @@ class UIMainForm:
         self._selected_organization_id = org_id
         self.shared_charges.populate_shared_charges_table()
         self.account_select.update_last_updated_label(org_id)
-        self.account_details.populate_account_list(org_id)
+        self.account_details.populate_account_list()
 
     def get_selected_organization_id(self) -> Optional[str]:
         return self._selected_organization_id
