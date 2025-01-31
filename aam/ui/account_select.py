@@ -4,9 +4,10 @@ from typing import TYPE_CHECKING
 
 import nicegui.events
 from nicegui import ui
+from peewee import JOIN
 
 import aam.aws
-from aam.models import Account, LastAccountUpdate, Organization
+from aam.models import Account, LastAccountUpdate, Organization, Person
 
 if TYPE_CHECKING:
     from aam.main import UIMainForm
@@ -61,7 +62,13 @@ class UIAccountSelect:
 
     def account_selected(self, event: nicegui.events.ValueChangeEventArguments):
         selected_account_id = event.sender.value
-        account = Account.get_or_none(Account.id == selected_account_id)
+        account = list((Account.select(Account, Person)
+                        .where(Account.id == selected_account_id)
+                        .join_from(Account, Person, JOIN.LEFT_OUTER)))
+        if account:
+            account = account[0]
+        else:
+            account = None
 
         self.parent.account_details.update(account)
         self.parent.set_selected_account_id(account)

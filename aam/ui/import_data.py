@@ -7,7 +7,7 @@ import nicegui.events
 from nicegui import ui
 
 import aam.utilities
-from aam.models import Account, Month, Transaction, Person, Sysadmin
+from aam.models import Account, Month, Person, Sysadmin, MonthlyUsage
 from aam.utilities import month_select, year_select
 
 if TYPE_CHECKING:
@@ -18,8 +18,8 @@ class UIImport:
     def __init__(self, parent: "UIMainForm"):
         self.parent = parent
         ui.html("Import data").classes("text-xl")
-        self.import_type = ui.select({1: "Transaction Data - One month", 2:"Transaction Data - One account", 3:"Exchange Rate", 4:"Account Details"}, label="Import Type", value=1,
-                                     on_change=self.import_type_selected)
+        self.import_type = ui.select({1: "Monthly Usage - One month, multiple account", 2:"Monthly usage - One account, multiple months", 3:"Exchange Rate", 4:"Account Details"},
+                                     label="Import Type", value=1, on_change=self.import_type_selected)
         self.description = ui.label("")
         with ui.grid(columns="auto auto").classes("place-items-center gap-1") as self.date_pick_grid:
             ui.label("Month")
@@ -63,9 +63,9 @@ class UIImport:
 
         import_type = self.import_type.value
         if import_type == 1:
-            self.import_month_transactions(data)
+            self.import_month_usage(data)
         if import_type == 2:
-            self.import_account_transactions(data)
+            self.import_account_monthly_usage(data)
         elif import_type == 3:
             self.import_exchange_rate(data)
         elif import_type == 4:
@@ -92,7 +92,7 @@ class UIImport:
         self.parent.settings.ui_exchange_rate.populate_exchange_rate_grid()
         ui.notify("Exchange rates imported.")
 
-    def import_month_transactions(self, data: str):
+    def import_month_usage(self, data: str):
         data = data.split("\n")
 
         valid_account_numbers = [account.id for account in Account.select(Account.id)]
@@ -136,28 +136,25 @@ class UIImport:
             try:
                 decimal.Decimal(line[-1])
             except decimal.InvalidOperation:
-                ui.notify(f"Malformed transaction amount on line {index + 1} - unable to convert to Decimal")
+                ui.notify(f"Malformed usage amount on line {index + 1} - unable to convert to Decimal")
                 return 0
             processed_lines.append(line)
         ui.notify("Data is valid.")
 
-        month = self.month.value
-        year = self.year.value
-        date = datetime.date(year, month, 1)
+        month_code = aam.utilities.month_code(self.year.value, self.month.value)
 
         for line in processed_lines:
-            transaction = Transaction.get_or_none(account=line[0], type="Monthly", date=date)
-            if transaction:
-                transaction.amount = decimal.Decimal(line[-1])
-                transaction.save()
+            usage = MonthlyUsage.get_or_none(account=line[0], month=month_code)
+            if usage:
+                usage.amount = decimal.Decimal(line[-1])
+                usage.save()
             else:
-                Transaction.create(account=line[0], type="Monthly", date=date, amount=decimal.Decimal(line[-1]),
-                                   is_pound=False)
+                MonthlyUsage.create(account=line[0], month=month_code, amount=decimal.Decimal(line[-1]))
 
         self.parent.transactions.update_transaction_grid()
-        ui.notify("Transactions added to accounts.")
+        ui.notify("Monthly Usage added to accounts.")
 
-    def import_account_transactions(self, data: str):
+    def import_account_monthly_usage(self, data: str):
         data = data.split("\n")
 
         valid_account_numbers = [account.id for account in Account.select(Account.id)]
@@ -193,21 +190,23 @@ class UIImport:
 
         for line in processed_lines:
             date = datetime.datetime.strptime(line[0], "%b-%y").date()
+            month_code = aam.utilities.month_code(date.year, date.month)
             amount = decimal.Decimal(line[1])
+            # AWS data from the API comes as gross totals while the breakdowns from Strategic Blue are net.
+            if date < datetime.date(2024, 7, 1):
+                amount = (amount / decimal.Decimal(1.2))
 
-            transaction = Transaction.get_or_none(account=account_number, date=date, type="Monthly")
-            if not transaction:
-                Transaction.create(account=account_number, date=date, type="Monthly", amount=amount, is_pound=False)
+            usage = MonthlyUsage.get_or_none(account=account_number, month=month_code)
+
+            if not usage:
+                MonthlyUsage.create(account=account_number, amount=amount, is_pound=False)
             else:
-                # AWS data from the API comes as gross totals while the breakdowns from Strategic Blue are net.
-                if date < datetime.date(2024, 7, 1):
-                    amount = (amount / decimal.Decimal(1.2))
-                transaction.amount = amount
-                transaction.save()
+                usage.amount = amount
+                usage.save()
         # If the account being imported to is currently visible then update the transactions grid.
         if self.parent.get_selected_account_id() == account_number:
             self.parent.transactions.update_transaction_grid()
-        ui.notify("Transactions added.")
+        ui.notify("Monthly Usage added.")
 
     @staticmethod
     def import_account_details(data: str):

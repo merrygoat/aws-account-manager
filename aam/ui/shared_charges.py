@@ -1,12 +1,12 @@
 import decimal
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Iterable
 
 import nicegui.events
 from nicegui import ui
 
+import aam.utilities
 from aam.models import SharedCharge, Account, Month, AccountJoinSharedCharge
-from aam.utilities import month_select, year_select, month_code
 
 if TYPE_CHECKING:
     from aam.main import UIMainForm
@@ -76,9 +76,29 @@ class UISharedCharges:
             ui.notify("Shared charge deleted.")
 
     def populate_shared_charges_table(self):
-        shared_charges = SharedCharge.select().where(SharedCharge.organization == self.parent.get_selected_organization_id())
-        shared_charges = [charge.to_dict() for charge in shared_charges]
-        self.shared_charges_table.options["rowData"] = shared_charges
+        charge_details = []
+        selected_organization = self.parent.get_selected_organization_id()
+        if selected_organization:
+            shared_charges: Iterable[SharedCharge] = (
+                SharedCharge.select(SharedCharge, AccountJoinSharedCharge, Account.name)
+                .join(AccountJoinSharedCharge)
+                .join(Account)
+                .where(Account.organization == self.parent.get_selected_organization_id()))
+
+            # One record is returned for each account in each shared charge
+            # Sort shared charges into dict using charge id as the index
+            sorted_shared_charges = {}
+            for charge in shared_charges:
+                sorted_shared_charges.setdefault(charge.id, []).append(charge)
+
+            for charge_id, charges in sorted_shared_charges.items():
+                month_date = aam.utilities.date_from_month_code(charges[0].month_id)
+                account_names = [charge.accountjoinsharedcharge.account.name for charge in charges]
+                account_names = ", ".join(sorted(account_names))
+                charge_details.append({"id": charge_id, "name": charges[0].name, "amount": charges[0].amount, "month": month_date,
+                                       "account_names": account_names})
+
+        self.shared_charges_table.options["rowData"] = charge_details
         self.shared_charges_table.update()
 
 
@@ -95,9 +115,9 @@ class UISharedChargeDialog:
                     ui.label("Name")
                     self.name = ui.input()
                     ui.label("Month")
-                    self.month = month_select()
+                    self.month = aam.utilities.month_select()
                     ui.label("Year")
-                    self.year = year_select()
+                    self.year = aam.utilities.year_select()
                     ui.label("Amount ($)")
                     self.amount = ui.input(validation=lambda value: 'Invalid format' if re.fullmatch(r"\d*.\d*", value) is None else None)
                     ui.label("Accounts")
@@ -125,21 +145,15 @@ class UISharedChargeDialog:
         self.account_select.set_options(accounts)
 
     def save_shared_charge(self, event: nicegui.events.ClickEventArguments):
-        if self.name == "":
-            ui.notify("Name must be provided.")
+        if not self.validate_inputs():
             return 0
 
-        try:
-            amount = decimal.Decimal(self.amount.value)
-        except decimal.InvalidOperation:
-            ui.notify("Amount is not a valid number.")
-            return 0
-
-        month = Month.get(month_code=month_code(self.year.value, self.month.value))
+        month_code = aam.utilities.month_code(self.year.value, self.month.value)
+        amount = decimal.Decimal(self.amount.value)
 
         if self.shared_charge_id:
             # Get existing SharedCharge and the accounts to which it applies
-            shared_charge = SharedCharge.get(SharedCharge.id == self.shared_charge_id)
+            shared_charge: SharedCharge = SharedCharge.get(SharedCharge.id == self.shared_charge_id)
             accounts = (Account.select(Account.id).where(SharedCharge.id == self.shared_charge_id)
                         .join(AccountJoinSharedCharge)
                         .join(SharedCharge).dicts())
@@ -158,11 +172,10 @@ class UISharedChargeDialog:
 
             shared_charge.name = self.name.value
             shared_charge.amount_pound = amount
-            shared_charge.month = month.month_code
+            shared_charge.month = month_code
             shared_charge.save()
         else:
-            shared_charge = SharedCharge.create(name=self.name.value, amount=amount, month=month.month_code,
-                                                organization=self.parent.parent.get_selected_organization_id())
+            shared_charge = SharedCharge.create(name=self.name.value, amount=amount, month=month_code)
             for account_id in self.account_select.value:
                 AccountJoinSharedCharge.create(account=account_id, shared_charge=shared_charge.id)
 
@@ -174,6 +187,18 @@ class UISharedChargeDialog:
             ui.notify("New shared charge added.")
         self.close()
 
+    def validate_inputs(self) -> bool:
+        """Returns True if all inputs are valid, else returns False."""
+        if self.name == "":
+            ui.notify("Name must be provided.")
+            return False
+        try:
+            decimal.Decimal(self.amount.value)
+        except decimal.InvalidOperation:
+            ui.notify("Amount is not a valid number.")
+            return False
+        return True
+
     def open(self, shared_charge: SharedCharge | None = None, mode: str = "new"):
         # Possible modes are "new", "edit" or "duplicate"
 
@@ -183,10 +208,10 @@ class UISharedChargeDialog:
             self.shared_charge_id = shared_charge.id
 
         if mode != "new":
-            month = Month.get(Month.month_code == shared_charge.month)
+            month: Month = Month.get(Month.month_code == shared_charge.month)
             accounts = (Account.select(Account.id).where(SharedCharge.id == shared_charge.id)
-                           .join(AccountJoinSharedCharge)
-                           .join(SharedCharge).dicts())
+                        .join(AccountJoinSharedCharge)
+                        .join(SharedCharge).dicts())
             account_ids = [account["id"] for account in accounts]
 
             self.name.value = shared_charge.name

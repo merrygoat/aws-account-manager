@@ -74,6 +74,10 @@ class UIAccountDetails:
                     'rowData': {},
                 })
 
+        all_people = {person.id: person.full_name for person in Person.select()}
+        self.budget_holder.set_options(all_people)
+        self.sysadmin.set_options(all_people)
+
         self.clear_account_details()
 
     def populate_account_list(self):
@@ -82,8 +86,8 @@ class UIAccountDetails:
         account_details = []
 
         if org_id:
-            accounts: Iterable[Account] = (Account.select().where(Account.organization == org_id)
-                                           .join_from(Account, Person)
+            accounts: Iterable[Account] = (Account.select(Account, Organization.name, Person.first_name, Person.last_name)
+                                           .join_from(Account, Person, JOIN.LEFT_OUTER)
                                            .join_from(Account, Organization))
             for account in accounts:
                 details = ({"id": account.id, "name": account.name, "organization": account.organization.name,
@@ -191,9 +195,6 @@ class UIAccountDetails:
         self.account_status.set_text(account.status)
 
         self.is_recharged.set_value(account.is_recharged)
-        all_people = {person.id: person.full_name for person in Person.select()}
-        self.budget_holder.set_options(all_people)
-        self.sysadmin.set_options(all_people)
 
         self.finance_code.set_value(account.finance_code)
         self.task_code.set_value(account.task_code)

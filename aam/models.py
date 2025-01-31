@@ -12,7 +12,6 @@ from collections.abc import Iterable
 
 import peewee
 from peewee import JOIN
-from playhouse.hybrid import hybrid_property
 
 import aam.utilities
 
@@ -42,7 +41,6 @@ class Organization(BaseModel):
     name = peewee.CharField(null=True)
     accounts: "Account"  # backref
     last_updated_time: Iterable["LastAccountUpdate"]  # backref
-    shared_charges: Iterable["SharedCharge"]  # backref
 
 class Account(BaseModel):
     id = peewee.CharField(primary_key=True)
@@ -70,23 +68,25 @@ class Account(BaseModel):
 
         self._check_missing_monthly_transactions(required_months)
 
-        required_transactions = (Transaction.select(Transaction, RechargeRequest.reference)
-            .join(RechargeRequest, JOIN.LEFT_OUTER)
-            .where((Transaction.month_code.in_(required_months)) & (Transaction.account == self.id)))
+        usage: Iterable[MonthlyUsage] = (MonthlyUsage.select(MonthlyUsage, RechargeRequest.reference, Month)
+                                         .join_from(MonthlyUsage, RechargeRequest, JOIN.LEFT_OUTER)
+                                         .join_from(MonthlyUsage, Month)
+                                         .where((MonthlyUsage.month_id.in_(required_months)) & (MonthlyUsage.account_id == self.id)))
 
-        transactions = [transaction.to_json() for transaction in required_transactions]
-        return transactions
+        usage_details = [monthly_usage.to_json() for monthly_usage in usage]
+        return usage_details
 
     def _check_missing_monthly_transactions(self, required_months: list[int]):
         """Accounts should have a usage transaction for each month the account is open. This function checks if the
         account has 'monthly' type transactions for each month code in `required_months`."""
-        required_transactions = (Transaction.select().where((Transaction.month_code.in_(required_months)) & (Transaction.account == self.id) & (Transaction.type == "Monthly")))
-        existing_transaction_months = [transaction.month_code for transaction in required_transactions]
+        usage: Iterable[MonthlyUsage] = (MonthlyUsage.select()
+                                         .where((MonthlyUsage.month_id.in_(required_months)) & (MonthlyUsage.account_id == self.id))
+                                         )
+        existing_transaction_months = [monthly_usage.month_id for monthly_usage in usage]
         missing_months = set(required_months) - set(existing_transaction_months)
         if missing_months:
             for month_code in missing_months:
-                date = datetime.date(year=aam.utilities.year_from_month_code(month_code), month=aam.utilities.month_from_month_code(month_code), day=1)
-                Transaction.create(account=self.id, type="Monthly", date=date, is_pound=False)
+                MonthlyUsage.create(account=self.id, month=month_code)
 
     def final_date(self) -> datetime.date:
         """Return the final date on which the account is active."""
@@ -150,14 +150,77 @@ class RechargeRequest(BaseModel):
     def to_json(self):
         return {"id": self.id, "date": self.date, "reference": self.reference, "status": self.status}
 
+
+class MonthlyUsage(BaseModel):
+    # Usage is always in dollars
+    id = peewee.AutoField()
+    account = peewee.ForeignKeyField(Account, backref="MonthlyUsage")
+    account_id: int  # Direct access to foreign key value
+    month: Month = peewee.ForeignKeyField(Month, backref="MonthlyUsage")
+    month_id: int  # Direct access to foreign key value
+    amount: Decimal = peewee.DecimalField(null=True)  # The net value of the usage
+    recharge_request = peewee.ForeignKeyField(RechargeRequest, backref="MonthlyUsage", null=True)
+
+    def to_json(self) -> dict:
+        date = aam.utilities.date_from_month_code(self.month_id)
+        details = {"id": self.id, "account_id": self.account_id, "type": "Monthly", "date": date, "amount": self.amount,
+                   "shared_charge": self.shared_charges, "support_charge": self.support_charge, "currency": "$",
+                   "gross_total_dollar": self.gross_total_dollar, "gross_total_pound": self.gross_total_pound}
+        if self.recharge_request:
+            details["recharge_reference"] = self.recharge_request.reference
+        else:
+            details["recharge_reference"] = "-"
+        return details
+
+    @property
+    def shared_charges(self) -> decimal.Decimal:
+        if self.account_id is None or self.month_id is None:
+            raise ValueError("Calculation of shared charges failed due to missing data.")
+        total = decimal.Decimal(0)
+        charges = (SharedCharge.select(SharedCharge)
+                   .where((AccountJoinSharedCharge.account == self.account_id) & (SharedCharge.month_id == self.month_id))
+                   .join(AccountJoinSharedCharge))
+        for charge in charges:
+            total += charge.cost_per_account()
+        return total
+
+    @property
+    def support_eligible(self) -> bool:
+        """Accounts must pay 10% charge after 01/08/24 as this was when the OGVA started."""
+        return self.month_id >= aam.utilities.month_code(2024, 8)
+
+    @property
+    def support_charge(self) -> Decimal:
+        """If the transaction needs to be charged for support, return the amount in dollars."""
+        if self.support_eligible and self.amount:
+            return (self.amount + self.shared_charges) * Decimal(0.1)
+        else:
+            return Decimal(0)
+
+    @property
+    def gross_total_dollar(self) -> Decimal:
+        """Usage + shared charges + support + VAT."""
+        if self.amount:
+            return (self.amount + self.shared_charges + self.support_charge) * Decimal(1.2)
+        else:
+            return Decimal(0)
+
+    @property
+    def gross_total_pound(self) -> Decimal:
+        """Gross total in dollars multiplied by exchange rate."""
+        if self.gross_total_dollar:
+            return self.gross_total_dollar * self.month.exchange_rate
+        else:
+            return Decimal(0)
+
 class Transaction(BaseModel):
     id = peewee.AutoField()
     account = peewee.ForeignKeyField(Account, backref="transactions")
-    type = peewee.CharField()  # ["Monthly", "Pre-pay", "Savings plan", "Adjustment"]
+    type = peewee.CharField()  # ["Pre-pay", "Savings plan", "Adjustment"]
     date: datetime.date = peewee.DateField()
     amount: Decimal = peewee.DecimalField(null=True)  # The net value of the transaction
     is_pound = peewee.BooleanField()
-    _exchange_rate: Decimal = peewee.DecimalField(null=True)   # USD/GBP
+    exchange_rate: Decimal = peewee.DecimalField(null=True)   # USD/GBP
     recharge_request = peewee.ForeignKeyField(RechargeRequest, backref="transactions", null=True)
 
     def to_json(self) -> dict:
@@ -169,29 +232,14 @@ class Transaction(BaseModel):
                                 "gross_total_pound": self.gross_total_pound})
         else:
             transaction.update({"currency": "$", "support_charge": self.support_charge,
-                                "shared_charge": self.shared_charges, "exchange_rate": self.exchange_rate,
-                                "gross_total_dollar": self.gross_total_dollar, "gross_total_pound": self.gross_total_pound})
+                                "exchange_rate": self.exchange_rate, "gross_total_dollar": self.gross_total_dollar,
+                                "gross_total_pound": self.gross_total_pound})
 
         if self.recharge_request:
             transaction["recharge_reference"] = self.recharge_request.reference
         else:
             transaction["recharge_reference"] = "-"
         return transaction
-
-    @hybrid_property
-    def month_code(self) -> int:
-        return aam.utilities.month_code(self.date.year, self.date.month)
-
-    @property
-    def month(self) -> Month:
-        return Month.get(Month.month_code == self.month_code)
-
-    @property
-    def exchange_rate(self) -> decimal.Decimal:
-        if self.type == "Monthly":
-            return self.month.exchange_rate
-        else:
-            return self._exchange_rate
 
     @property
     def amount_pound(self) -> decimal.Decimal | None:
@@ -215,36 +263,12 @@ class Transaction(BaseModel):
                 return None
 
     @property
-    def support_eligible(self) -> bool:
-        """Accounts must pay 10% charge after 01/08/24 as this was when the OGVA started."""
-        return (self.type == "Monthly") and (self.date >= datetime.date(2024, 8, 1))
-
-    @property
-    def support_charge(self) -> Decimal:
-        """If the transaction needs to be charged for support, return the amount in dollars."""
-        if self.support_eligible and self.amount_dollar:
-            return (self.amount_dollar + self.shared_charges) * Decimal(0.1)
-        else:
-            return Decimal(0)
-
-    @property
-    def shared_charges(self) -> decimal.Decimal:
-        if self.account.id is None or self.month.month_code is None:
-            raise ValueError("Calculation of shared charges failed due to missing data.")
-        total = decimal.Decimal(0)
-        charges = (SharedCharge.select().where((AccountJoinSharedCharge.account == self.account.id) & (SharedCharge.month == self.month.month_code))
-                   .join(AccountJoinSharedCharge))
-        for charge in charges:
-            total += charge.cost_per_account()
-        return total
-
-    @property
     def gross_total_dollar(self) -> Decimal | None:
         """Calculate the total cost for the month, adding 20% for VAT."""
         if self.amount is None or self.amount_dollar is None:
             return None
         else:
-            return (self.amount_dollar + self.support_charge + self.shared_charges) * Decimal(1.2)
+            return self.amount_dollar * Decimal(1.2)
 
     @property
     def gross_total_pound(self) -> Decimal | None:
@@ -258,24 +282,12 @@ class Transaction(BaseModel):
 
 
 class SharedCharge(BaseModel):
+    # Shared charges are a way to assign additional usage to a MonthlyUsage.
     id = peewee.AutoField()
     name = peewee.TextField()
     amount: decimal.Decimal = peewee.DecimalField()
-    organization = peewee.ForeignKeyField(Organization, backref="shared_charges")
     month: Month = peewee.ForeignKeyField(Month, backref="shared_charges")
-    month_id: int  # The actual month primary key value
-
-    def to_dict(self):
-        # Use the primary key value to get date rather than the Month object to avoid a lookup
-        month_date = aam.utilities.date_from_month_code(self.month_id)
-        charges = (SharedCharge.select(Account.name).where(SharedCharge.id == self.id)
-                   .join(AccountJoinSharedCharge)
-                   .join(Account).dicts())
-        account_names = [charge["name"] for charge in charges]
-        account_names = ", ".join(sorted(account_names))
-
-        return {"id": self.id, "name": self.name, "amount": self.amount, "month": month_date,
-                "account_names": account_names}
+    month_id: int  # Direct access to the Foreign key value
 
     def num_accounts(self) -> int:
         return AccountJoinSharedCharge.select().where(AccountJoinSharedCharge.shared_charge == self.id).count()
@@ -292,5 +304,5 @@ class AccountJoinSharedCharge(BaseModel):
         primary_key = peewee.CompositeKey('account', 'shared_charge')
 
 
-db.create_tables([Account, LastAccountUpdate, Person, Sysadmin, Note, Month, Transaction, RechargeRequest,
+db.create_tables([Account, LastAccountUpdate, Person, Sysadmin, Note, Month, MonthlyUsage, Transaction, RechargeRequest,
                   SharedCharge, AccountJoinSharedCharge, Organization])

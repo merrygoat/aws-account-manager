@@ -1,13 +1,13 @@
 import datetime
 import decimal
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Iterable
 
 import nicegui.events
 from nicegui import ui
 
 from aam import utilities
-from aam.models import Account, Person, RechargeRequest, Transaction
+from aam.models import Account, Person, RechargeRequest, Transaction, MonthlyUsage
 
 if TYPE_CHECKING:
     from aam.main import UIMainForm
@@ -78,10 +78,6 @@ class UITransactions:
 
         transactions = Transaction.select().where(Transaction.id.in_(transaction_ids))
         for transaction in transactions:
-            if transaction.type == "Monthly":
-                ui.notify(f"Cannot delete 'Monthly' type transactions.")
-                return 0
-        for transaction in transactions:
             transaction.delete_instance()
             self.update_transaction_grid()
             selected_request_row = await(self.ui_recharge_requests.recharge_request_grid.get_selected_row())
@@ -101,7 +97,11 @@ class UITransactions:
 
     def update_transaction(self, event: nicegui.events.GenericEventArguments):
         transaction_id = event.args["data"]["id"]
-        transaction: Transaction = Transaction.get(id=transaction_id)
+        transaction_type = event.args["data"]["type"]
+        if transaction_type == "Monthly":
+            transaction: MonthlyUsage = MonthlyUsage.get(id=transaction_id)
+        else:
+            transaction: Transaction = Transaction.get(id=transaction_id)
         try:
             amount = decimal.Decimal(event.args["data"]["amount"])
         except decimal.InvalidOperation:
@@ -153,8 +153,9 @@ class UIRechargeRequests:
         request.save()
 
     def populate_request_grid(self):
-        requests = [request.to_json() for request in RechargeRequest.select()]
-        self.recharge_request_grid.options["rowData"] = requests
+        requests: Iterable[RechargeRequest] = RechargeRequest.select()
+        request_details = [request.to_json() for request in requests]
+        self.recharge_request_grid.options["rowData"] = request_details
         self.recharge_request_grid.update()
 
     async def delete_selected_request(self, event: nicegui.events.ClickEventArguments):

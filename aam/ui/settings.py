@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Iterable
 
 from nicegui import ui
 import nicegui.events
@@ -43,8 +43,9 @@ class UIExchangeRate:
         self.populate_exchange_rate_grid()
 
     def populate_exchange_rate_grid(self):
-        months = [{"month_code": month.month_code, "month": str(month), "exchange_rate": month.exchange_rate} for month in Month.select()]
-        self.month_grid.options["rowData"] = months
+        months: Iterable[Month] = Month.select()
+        month_details = [{"month_code": month.month_code, "month": str(month), "exchange_rate": month.exchange_rate} for month in months]
+        self.month_grid.options["rowData"] = month_details
         self.month_grid.update()
 
     @staticmethod
