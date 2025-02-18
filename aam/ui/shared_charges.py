@@ -150,34 +150,34 @@ class UISharedChargeDialog:
 
         month_code = aam.utilities.month_code(self.year.value, self.month.value)
         amount = decimal.Decimal(self.amount.value)
+        num_selected_accounts = len(self.account_select.value)
+        amount_per_account = amount / num_selected_accounts
 
-        if self.shared_charge_id:
-            # Get existing SharedCharge and the accounts to which it applies
+        if not self.shared_charge_id:
+            shared_charge = SharedCharge.create(name=self.name.value, amount=amount, month=month_code)
+        else:
+
+            # Get existing SharedCharge
             shared_charge: SharedCharge = SharedCharge.get(SharedCharge.id == self.shared_charge_id)
+            shared_charge.name = self.name.value
+            shared_charge.amount_pound = amount
+            shared_charge.month_id = month_code
+            shared_charge.save()
+
+            # Get the accounts to which the shared charge applies
             accounts = (Account.select(Account.id).where(SharedCharge.id == self.shared_charge_id)
                         .join(AccountJoinSharedCharge)
                         .join(SharedCharge).dicts())
             account_ids = [account["id"] for account in accounts]
-            ids_to_add = set(self.account_select.value) - set(account_ids)
-            ids_to_delete = set(account_ids) - set(self.account_select.value)
+            # If there is any change in the accounts on the shared charge then redo the AccountJoinSharedCharges
+            if not set(self.account_select.value) == set(account_ids):
+                # Delete AccountJoinSharedCharges currently associated with the Shared Charge
+                (AccountJoinSharedCharge.delete()
+                 .where((AccountJoinSharedCharge.account.in_(account_ids)) & (AccountJoinSharedCharge.shared_charge == shared_charge.id))
+                 .execute())
 
-            # Add any newly selected accounts
-            for account_id in ids_to_add:
-                AccountJoinSharedCharge.create(account=account_id, shared_charge=shared_charge.id)
-
-            # Delete any accounts no longer selected
-            (AccountJoinSharedCharge.delete()
-             .where((AccountJoinSharedCharge.account.in_(ids_to_delete)) & (AccountJoinSharedCharge.shared_charge == shared_charge.id))
-             .execute())
-
-            shared_charge.name = self.name.value
-            shared_charge.amount_pound = amount
-            shared_charge.month = month_code
-            shared_charge.save()
-        else:
-            shared_charge = SharedCharge.create(name=self.name.value, amount=amount, month=month_code)
-            for account_id in self.account_select.value:
-                AccountJoinSharedCharge.create(account=account_id, shared_charge=shared_charge.id)
+        for account_id in self.account_select.value:
+            AccountJoinSharedCharge.create(account=account_id, shared_charge=shared_charge.id, amount=amount_per_account)
 
         self.parent.populate_shared_charges_table()
         self.parent.parent.transactions.update_transaction_grid()
@@ -208,6 +208,7 @@ class UISharedChargeDialog:
             self.shared_charge_id = shared_charge.id
 
         if mode != "new":
+            # Get accounts associated with exising shared charge
             month: Month = Month.get(Month.month_code == shared_charge.month)
             accounts = (Account.select(Account.id).where(SharedCharge.id == shared_charge.id)
                         .join(AccountJoinSharedCharge)

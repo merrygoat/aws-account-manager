@@ -190,9 +190,7 @@ class UIRechargeRequests:
         # Group transactions by account
         transaction_dict = {}
         for transaction in transactions:
-            if transaction.account.id not in transaction_dict:
-                transaction_dict[transaction.account.id] = []
-            transaction_dict[transaction.account.id].append(transaction)
+            transaction_dict.setdefault(transaction.account.id, []).append(transaction)
 
         export_string = "Account Number, Account Name, Budget Holder Name, Budget Holder Email, CC email, Finance Code, Task Code, Total\n"
         for account_number, transactions in transaction_dict.items():

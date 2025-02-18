@@ -68,10 +68,22 @@ class Account(BaseModel):
 
         self._check_missing_monthly_transactions(required_months)
 
-        usage: Iterable[MonthlyUsage] = (MonthlyUsage.select(MonthlyUsage, RechargeRequest.reference, Month)
+        usage: Iterable[MonthlyUsage] = (MonthlyUsage.select(MonthlyUsage, RechargeRequest.reference, Month, SharedCharge.amount)
                                          .join_from(MonthlyUsage, RechargeRequest, JOIN.LEFT_OUTER)
                                          .join_from(MonthlyUsage, Month)
+                                         .join(SharedCharge, JOIN.LEFT_OUTER)
                                          .where((MonthlyUsage.month_id.in_(required_months)) & (MonthlyUsage.account_id == self.id)))
+
+        # Group MonthlyUsage by month as multiple shared charges in a single month will generate multiple rows for that month
+        grouped_usage = {}
+        for row in usage:
+            grouped_usage.setdefault(row.month_id, []).append(row)
+
+        for month_code, monthly_usage in grouped_usage.items():
+            if len(monthly_usage) > 1:
+                amount = sum([i.month.shared_charge.amount for i in monthly_usage])
+                monthly_usage[0].month.shared_charge.amount = amount
+
 
         usage_details = [monthly_usage.to_json() for monthly_usage in usage]
         return usage_details
@@ -79,7 +91,7 @@ class Account(BaseModel):
     def _check_missing_monthly_transactions(self, required_months: list[int]):
         """Accounts should have a usage transaction for each month the account is open. This function checks if the
         account has 'monthly' type transactions for each month code in `required_months`."""
-        usage: Iterable[MonthlyUsage] = (MonthlyUsage.select()
+        usage: Iterable[MonthlyUsage] = (MonthlyUsage.select(MonthlyUsage.month_id)
                                          .where((MonthlyUsage.month_id.in_(required_months)) & (MonthlyUsage.account_id == self.id))
                                          )
         existing_transaction_months = [monthly_usage.month_id for monthly_usage in usage]
@@ -158,6 +170,7 @@ class MonthlyUsage(BaseModel):
     account_id: int  # Direct access to foreign key value
     month: Month = peewee.ForeignKeyField(Month, backref="MonthlyUsage")
     month_id: int  # Direct access to foreign key value
+    shared_charge: Decimal = peewee.DecimalField(default=0)
     amount: Decimal = peewee.DecimalField(null=True)  # The net value of the usage
     recharge_request = peewee.ForeignKeyField(RechargeRequest, backref="MonthlyUsage", null=True)
 
@@ -177,11 +190,11 @@ class MonthlyUsage(BaseModel):
         if self.account_id is None or self.month_id is None:
             raise ValueError("Calculation of shared charges failed due to missing data.")
         total = decimal.Decimal(0)
-        charges = (SharedCharge.select(SharedCharge)
+        charges = (SharedCharge.select(SharedCharge.month_id, AccountJoinSharedCharge.amount)
                    .where((AccountJoinSharedCharge.account == self.account_id) & (SharedCharge.month_id == self.month_id))
                    .join(AccountJoinSharedCharge))
         for charge in charges:
-            total += charge.cost_per_account()
+            total += charge.accountjoinsharedcharge.amount
         return total
 
     @property
@@ -289,16 +302,15 @@ class SharedCharge(BaseModel):
     month: Month = peewee.ForeignKeyField(Month, backref="shared_charges")
     month_id: int  # Direct access to the Foreign key value
 
-    def num_accounts(self) -> int:
-        return AccountJoinSharedCharge.select().where(AccountJoinSharedCharge.shared_charge == self.id).count()
-
-    def cost_per_account(self) -> decimal.Decimal:
-        return self.amount / self.num_accounts()
-
 
 class AccountJoinSharedCharge(BaseModel):
     account = peewee.ForeignKeyField(Account, backref="shared_charges_join")
+    account_id: int  # Direct access to Foreign Key
     shared_charge = peewee.ForeignKeyField(SharedCharge, backref="account_join", on_delete="CASCADE")
+    # The amount of the shared charge assigned to the account.
+    # Am I even allowed to put values in an association table? It feels a bit weird, but I think it works...
+    amount: decimal = peewee.DecimalField()
+    shared_charge_id: int  # Direct access to foreign key value
 
     class Meta:
         primary_key = peewee.CompositeKey('account', 'shared_charge')
