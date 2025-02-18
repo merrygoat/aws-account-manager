@@ -108,22 +108,25 @@ class UIImport:
             return 0
 
         # Check data validity
+        # Assumes account number is first field and amount is last field. Optional account name inbetween.
         for index, line in enumerate(data):
             # Remove all spaces
             line = line.replace(" ", "")
+            # Remove any trailing commas
+            line = line.rstrip(",")
             # If the line is blank then skip it
             if line == "":
                 continue
             # Remove dollar signs
             line = line.replace("$", "")
-            # No usage can be represented by a dash
-            line = line.replace("-", "0")
             # Remove any thousand or million separators in usage amount
-            line = re.sub(",(?=\d{3})", "", line)
+            line = re.sub("\d,(?=\d{3})", "", line)
             # Any other commas are now delimiters so replace them with tabs
             line = line.replace(",", "\t")
             # Split the line by field seperator
             line = line.split("\t")
+            # No usage can be represented by a dash
+            line[-1] = line[-1].replace("-", "0")
             if len(line) not in [2, 3]:
                 ui.notify(f"Malformed data on line {index} - wrong number of fields.")
                 return 0
