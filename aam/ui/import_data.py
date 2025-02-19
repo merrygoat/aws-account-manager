@@ -1,5 +1,6 @@
 import datetime
 import decimal
+from time import strftime
 from typing import TYPE_CHECKING
 import re
 
@@ -51,8 +52,8 @@ class UIImport:
             self.date_pick_grid.set_visibility(False)
         elif import_type == 4:
             self.description.text = ('Data must be in the format, "Account Number, Account Name, Budget holder Name, '
-                                     'Budgetholder email, Sysadmin Name, Sysadmin Email, Finance Code, Task Code", '
-                                     'with one account per line.')
+                                     'Budgetholder email, Sysadmin Name, Sysadmin Email, Finance Code, Task Code,'
+                                     ' Creation Date (YYYY-MM-DD)", with one account per line.')
             self.date_pick_grid.set_visibility(False)
 
     def import_data(self, event: nicegui.events.ClickEventArguments):
@@ -242,10 +243,12 @@ class UIImport:
             sysadmin_email = line[5]
             finance_code = line[6]
             task_code = line[7]
+            account_opened = line[8]
             account: Account = Account.get(Account.id==account_id)
             account.name = account_name
             account.finance_code = finance_code
             account.task_code = task_code
+            account.creation_date = datetime.date.fromisoformat(account_opened)
 
             if budget_holder_name:
                 budget_holder = Person.get_or_create(first_name=budget_holder_name[0], last_name=budget_holder_name[1],

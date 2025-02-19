@@ -125,8 +125,8 @@ def get_and_process_account_info(org_id: str):
             account.status = "Closed"
         else:
             account.status = account_info[account_id]["Status"]
-        if account.organization_select is None:
-            account.organization_select = organization.id
+        if account.organization is None:
+            account.organization = organization.id
         account.save()
 
     # Loop through all account in AWS data, adding any that are not in the DB to the DB

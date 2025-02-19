@@ -67,12 +67,15 @@ class UIAccountDetails:
                                    {"headerName": "Organization", "field": "organization", "sort": "asc", "sortIndex": 0},
                                    {"headerName": "Name", "field": "name", "sort": "asc", "sortIndex": 1},
                                    {"headerName": "Status", "field": "status"},
+                                   {"headerName": "Date Opened", "field": "opened_date"},
+                                   {"headerName": "Date Closed", "field": "closure_date"},
                                    {"headerName": "Is recharged", "field": "is_recharged"},
                                    {"headerName": "Budget Holder", "field": "budget_holder"},
                                    {"headerName": "Finance Code", "field": "finance_code"},
                                    {"headerName": "Task Code", "field": "task_code"}],
                     'rowData': {},
                 })
+                self.refresh_list_button = ui.button("Refresh account list", on_click=self.populate_account_list)
 
         all_people = {person.id: person.full_name for person in Person.select()}
         self.budget_holder.set_options(all_people)
@@ -91,13 +94,15 @@ class UIAccountDetails:
                                            .join_from(Account, Organization))
             for account in accounts:
                 details = ({"id": account.id, "name": account.name, "organization": account.organization.name,
-                            "status": account.status, "finance_code": account.finance_code,
+                            "status": account.status, "opened_date": account.creation_date,
+                            "closure_date": account.closure_date, "finance_code": account.finance_code,
                             "task_code": account.task_code, "is_recharged": account.is_recharged})
                 if account.budget_holder:
                     details["budget_holder"] = f"{account.budget_holder.first_name} {account.budget_holder.last_name}"
                 account_details.append(details)
 
         self.account_grid.options["rowData"] = account_details
+        self.account_grid.update()
 
     def save_account_changes(self):
         account: Account = Account.get(Account.id == self.account_id.text)
