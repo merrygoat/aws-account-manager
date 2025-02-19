@@ -59,34 +59,45 @@ class Account(BaseModel):
     transactions: Iterable["Transaction"]  # backref
 
     def get_transactions(self) -> list[dict]:
-        """Returns a list of dicts describing month transactions in the account between the creation date and the
-        account closure date. If the account creation date is not set then return an empty list."""
+        """Returns a list of dicts describing MonthlyUsage and Transactions in the account between the creation date
+        and the account closure date. If the account creation date is not set then return an empty list."""
         if not self.creation_date:
             return []
 
-        required_months = aam.utilities.get_months_between(self.creation_date, self.final_date())
+        transactions = self.get_monthly_usage_details()
+        transactions.extend(self.get_transaction_details())
+        return transactions
 
+    def get_transaction_details(self) -> list[dict]:
+        """Returns a list of dicts describing Transactions between the account creation date and the account
+        closure date"""
+        if not self.creation_date:
+            return []
+
+        end_date = self.closure_date
+        if not end_date:
+            end_date = datetime.date.today()
+        transactions: Iterable[Transaction] = (
+            Transaction.select()
+            .join(RechargeRequest, JOIN.LEFT_OUTER)
+            .where((Transaction.account == self.id) & (Transaction.date > self.creation_date) & (Transaction.date < end_date))
+        )
+        return [transaction.to_json() for transaction in transactions]
+
+    def get_monthly_usage_details(self) -> list[dict]:
+        """Returns a list of dicts describing MonthlyUsage between the account creation date and the account
+        closure date"""
+        required_months = aam.utilities.get_months_between(self.creation_date, self.final_date())
         self._check_missing_monthly_transactions(required_months)
 
-        usage: Iterable[MonthlyUsage] = (MonthlyUsage.select(MonthlyUsage, RechargeRequest.reference, Month, SharedCharge.amount)
-                                         .join_from(MonthlyUsage, RechargeRequest, JOIN.LEFT_OUTER)
-                                         .join_from(MonthlyUsage, Month)
-                                         .join(SharedCharge, JOIN.LEFT_OUTER)
-                                         .where((MonthlyUsage.month_id.in_(required_months)) & (MonthlyUsage.account_id == self.id)))
+        # MonthlyUsage.to_json uses Month and RechargeRequest.reference
+        usage: Iterable[MonthlyUsage] = (
+            MonthlyUsage.select(MonthlyUsage, Month, RechargeRequest.reference)
+            .join_from(MonthlyUsage, RechargeRequest, JOIN.LEFT_OUTER)
+            .join_from(MonthlyUsage, Month)
+            .where((MonthlyUsage.month_id.in_(required_months)) & (MonthlyUsage.account_id == self.id)))
 
-        # Group MonthlyUsage by month as multiple shared charges in a single month will generate multiple rows for that month
-        grouped_usage = {}
-        for row in usage:
-            grouped_usage.setdefault(row.month_id, []).append(row)
-
-        for month_code, monthly_usage in grouped_usage.items():
-            if len(monthly_usage) > 1:
-                amount = sum([i.month.shared_charge.amount for i in monthly_usage])
-                monthly_usage[0].month.shared_charge.amount = amount
-
-
-        usage_details = [monthly_usage.to_json() for monthly_usage in usage]
-        return usage_details
+        return [monthly_usage.to_json() for monthly_usage in usage]
 
     def _check_missing_monthly_transactions(self, required_months: list[int]):
         """Accounts should have a usage transaction for each month the account is open. This function checks if the
@@ -244,8 +255,8 @@ class Transaction(BaseModel):
             transaction.update({"currency": "£", "support_charge": "-", "shared_charge": "-", "gross_total_dollar": "-",
                                 "gross_total_pound": self.gross_total_pound})
         else:
-            transaction.update({"currency": "$", "support_charge": self.support_charge,
-                                "exchange_rate": self.exchange_rate, "gross_total_dollar": self.gross_total_dollar,
+            transaction.update({"currency": "$", "support_charge": 0, "exchange_rate": self.exchange_rate,
+                                "gross_total_dollar": self.gross_total_dollar,
                                 "gross_total_pound": self.gross_total_pound})
 
         if self.recharge_request:

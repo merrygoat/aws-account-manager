@@ -73,7 +73,12 @@ class UITransactions:
         selected_rows = await(self.get_selected_rows())
         if selected_rows is None:
             ui.notify("No recharge request selected")
+
+        transaction_types = [row["type"] for row in selected_rows]
+        if "Monthly" in transaction_types:
+            ui.notify("Monthly type transactions can not be deleted.")
             return 0
+
         transaction_ids = [row["id"] for row in selected_rows]
 
         transactions = Transaction.select().where(Transaction.id.in_(transaction_ids))
