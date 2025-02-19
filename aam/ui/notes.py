@@ -1,5 +1,5 @@
 import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Iterable
 
 import nicegui.events
 from nicegui import ui
@@ -53,12 +53,12 @@ class UIAccountNotes:
             self.clear()
             return 0
 
-        notes = [note for note in Note.select().where(Note.account == account_id)]
+        notes: Iterable[Note] = Note.select().where(Note.account == account_id)
         if notes:
-            notes = [{"id": note.id, "date": note.date, "text": note.text} for note in notes]
+            note_details = [{"id": note.id, "date": note.date, "text": note.text} for note in notes]
         else:
-            notes = []
-        self.notes_grid.options["rowData"] = notes
+            note_details = []
+        self.notes_grid.options["rowData"] = note_details
         self.notes_grid.update()
 
     def clear(self):
@@ -132,7 +132,7 @@ class EditNoteDialog:
     def open(self, note_id: int):
         self.note_id = note_id
 
-        note = Note.get(id=note_id)
+        note: Note = Note.get(id=note_id)
         self.date_input.value = note.date
         self.text.value = note.text
         self.dialog.open()
@@ -155,7 +155,7 @@ class EditNoteDialog:
             return 0
 
         existing_note_id = self.note_id
-        existing_note = Note.get(id=existing_note_id)
+        existing_note: Note = Note.get(id=existing_note_id)
         existing_note.text = self.text.value
         existing_note.date = date
         existing_note.save()
