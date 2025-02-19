@@ -3,13 +3,13 @@ from typing import Optional
 from nicegui import ui, app
 
 from aam import initialization
-from aam.models import Account, Organization
+from aam.models import Account
+from aam.ui.data_quality import UIDataQuality
 from aam.ui.transactions import UITransactions
 from aam.ui.import_data import UIImport
 from aam.ui.settings import UISettings
 from aam.ui.account_details import UIAccountDetails
 from aam.ui.account_select import UIAccountSelect
-from aam.ui.notes import UIAccountNotes
 from aam.ui.people import UIPeople
 from aam.ui.shared_charges import UISharedCharges
 
@@ -22,7 +22,7 @@ logger.setLevel(logging.DEBUG)
 def main():
     initialization.initialize()
 
-    main_form = UIMainForm()
+    UIMainForm()
     app.on_exception(lambda e: ui.notify(f"Exception: {e}"))
     ui.run()
 
@@ -43,6 +43,7 @@ class UIMainForm:
                     self.transactions_tab = ui.tab('Transactions', icon='payments')
                     self.shared_charges_tab = ui.tab('Shared Charges', icon='attach_money')
                     self.import_tab = ui.tab('Import', icon='publish')
+                    self.data_quality_tab = ui.tab('Data Quality', icon='verified')
                     self.people_tab = ui.tab('People', icon='face')
                     self.settings_tab = ui.tab('Settings', icon='settings')
             with splitter.after:
@@ -55,6 +56,8 @@ class UIMainForm:
                         self.shared_charges = UISharedCharges(self)
                     with ui.tab_panel(self.import_tab):
                         self.import_data = UIImport(self)
+                    with ui.tab_panel(self.data_quality_tab):
+                        self.data_quality = UIDataQuality(self)
                     with ui.tab_panel(self.people_tab):
                         self.people = UIPeople(self)
                     with ui.tab_panel(self.settings_tab):

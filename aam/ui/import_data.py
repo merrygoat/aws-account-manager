@@ -1,6 +1,5 @@
 import datetime
 import decimal
-from time import strftime
 from typing import TYPE_CHECKING
 import re
 
