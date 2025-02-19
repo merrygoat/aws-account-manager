@@ -188,6 +188,14 @@ class UIRechargeRequests:
                         .join(Account)
                         .join(Person)
                         .where(Transaction.recharge_request == request_id))
+        usage = (MonthlyUsage.select(MonthlyUsage, Account, Person)
+                 .join(Account)
+                 .join(Person)
+                 .where(Transaction.recharge_request == request_id))
+
+        transactions = list(transactions)
+        transactions.extend(list(usage))
+
         if not transactions:
             ui.notify("Cannot export recharge request as it has no recharges.")
             return 0
@@ -234,17 +242,25 @@ class UIRequestItems:
         if request_id is None:
             return 0
 
-        transactions = (Transaction.select(Transaction, Account)
-                        .join(Account)
-                        .where(Transaction.recharge_request == request_id))
+        transactions: Iterable[Transaction] = (Transaction.select(Transaction, Account)
+                                               .join(Account)
+                                               .where(Transaction.recharge_request == request_id))
+        monthly_usage: Iterable[MonthlyUsage] = (MonthlyUsage.select(MonthlyUsage, Account)
+                                         .join(Account)
+                                         .where(MonthlyUsage.recharge_request == request_id))
+
         recharges_list = []
         for transaction in transactions:
             recharges_list.append({"transaction_id": transaction.id, "account_name": f"{transaction.account.name} - {transaction.account}",
                                    "date": transaction.date, "type": transaction.type, "recharge_amount": transaction.gross_total_pound})
+        for usage in monthly_usage:
+            recharges_list.append({"transaction_id": usage.id, "account_name": f"{usage.account.name} - {usage.account}",
+                                   "date": usage.date, "type": "Monthly", "recharge_amount": usage.gross_total_pound})
         self.request_items_grid.options["rowData"] = recharges_list
         self.request_items_grid.update()
 
     async def add_transaction_to_request(self, event: nicegui.events.ClickEventArguments):
+        """Get selected Transactions and MonthlyUsage and add them to the recharge request."""
         selected_request_row = await(self.parent.ui_recharge_requests.recharge_request_grid.get_selected_row())
         if not selected_request_row:
             ui.notify("No recharge request selected")
@@ -256,14 +272,26 @@ class UIRequestItems:
             ui.notify("No transactions selected")
             return 0
 
-        transaction_ids = [row["id"] for row in selected_transaction_rows]
-        transactions = Transaction.select().where(Transaction.id.in_(transaction_ids))
+        monthly_ids = []
+        transaction_ids = []
+        for row in selected_transaction_rows:
+            if row["type"] == "Monthly":
+                monthly_ids.append(row["id"])
+            else:
+                transaction_ids.append(row["id"])
+
+        # Can combine MonthlyUsage and Transactions as they both have the required properties.
+        usage = list(MonthlyUsage.select().where(MonthlyUsage.id.in_(monthly_ids)))
+        transactions = list(Transaction.select().where(Transaction.id.in_(transaction_ids)))
+        transactions.extend(usage)
+
         for transaction in transactions:
             if transaction.amount is None:
                 ui.notify(f"Cannot add transaction for date {str(transaction.date)} as it has no recorded usage.")
             else:
                 transaction.recharge_request = selected_recharge_id
                 transaction.save()
+
         self.parent.update_transaction_grid()
         self.update_request_items_grid(selected_recharge_id)
 
@@ -274,12 +302,25 @@ class UIRequestItems:
             ui.notify("No transactions selected to remove.")
             return 0
 
-        selected_transactions = [row["transaction_id"] for row in selected_rows]
+        selected_usage = []
+        selected_transactions = []
+        for row in selected_rows:
+            if row["type"] == "Monthly":
+                selected_usage.append(row["transaction_id"])
+            else:
+                selected_transactions.append(row["transaction_id"])
 
-        transactions = Transaction.select().where(Transaction.id.in_(selected_transactions))
-        for transaction in transactions:
-            transaction.recharge_request = None
-            transaction.save()
+        if selected_usage:
+            usage = MonthlyUsage.select().where(MonthlyUsage.id.in_(selected_usage))
+            for month in usage:
+                month.recharge_request = None
+                month.save()
+
+        if selected_transactions:
+            transactions = Transaction.select().where(Transaction.id.in_(selected_transactions))
+            for transaction in transactions:
+                transaction.recharge_request = None
+                transaction.save()
 
         selected_request_row = await(self.parent.ui_recharge_requests.recharge_request_grid.get_selected_row())
         selected_request_id = selected_request_row["id"]

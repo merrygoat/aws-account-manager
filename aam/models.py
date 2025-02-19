@@ -197,6 +197,10 @@ class MonthlyUsage(BaseModel):
         return details
 
     @property
+    def date(self) -> datetime.date:
+        return aam.utilities.date_from_month_code(self.month_id)
+
+    @property
     def shared_charges(self) -> decimal.Decimal:
         if self.account_id is None or self.month_id is None:
             raise ValueError("Calculation of shared charges failed due to missing data.")
