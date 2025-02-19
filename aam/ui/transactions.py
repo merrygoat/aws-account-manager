@@ -168,8 +168,8 @@ class UIRechargeRequests:
         if selected_row is None:
             ui.notify("No recharge request selected to delete.")
             return 0
-        request = RechargeRequest.get(selected_row["id"])
-        if request.transaction:
+        request: RechargeRequest = RechargeRequest.get(selected_row["id"])
+        if request.transactions or request.monthly_usage:
             ui.notify("Recharge request has recharges. These must be removed before deleting the request.")
             return 0
         else:

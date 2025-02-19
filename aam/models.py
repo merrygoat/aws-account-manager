@@ -169,6 +169,7 @@ class RechargeRequest(BaseModel):
     reference = peewee.CharField()
     status = peewee.CharField()
     transactions: Iterable["Transaction"]  # backref
+    monthly_usage: Iterable["MonthlyUsage"]  # backref
 
     def to_json(self):
         return {"id": self.id, "date": self.date, "reference": self.reference, "status": self.status}
@@ -177,13 +178,13 @@ class RechargeRequest(BaseModel):
 class MonthlyUsage(BaseModel):
     # Usage is always in dollars
     id = peewee.AutoField()
-    account = peewee.ForeignKeyField(Account, backref="MonthlyUsage")
+    account = peewee.ForeignKeyField(Account, backref="monthly_usage")
     account_id: int  # Direct access to foreign key value
-    month: Month = peewee.ForeignKeyField(Month, backref="MonthlyUsage")
+    month: Month = peewee.ForeignKeyField(Month, backref="monthly_usage")
     month_id: int  # Direct access to foreign key value
     shared_charge: Decimal = peewee.DecimalField(default=0)
     amount: Decimal = peewee.DecimalField(null=True)  # The net value of the usage
-    recharge_request = peewee.ForeignKeyField(RechargeRequest, backref="MonthlyUsage", null=True)
+    recharge_request = peewee.ForeignKeyField(RechargeRequest, backref="monthly_usage", null=True)
 
     def to_json(self) -> dict:
         date = aam.utilities.date_from_month_code(self.month_id)
