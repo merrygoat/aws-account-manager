@@ -11,7 +11,7 @@ def get_months_between(start_date: datetime.date, end_date: datetime.date) -> li
     return list(range(start_date, end_date + 1))
 
 
-def date_picker() -> ui.input:
+def date_picker(initial_value: datetime.date = None) -> ui.input:
     with ui.input(validation=lambda value: 'Invalid format' if (len(value) > 1) & (re.fullmatch(r"\d{4}-\d{2}-\d{2}", value) is None) else None).props("dense") as date_input:
         with ui.menu().props('no-parent-event') as account_creation_menu:
             with ui.date().bind_value(date_input):
@@ -19,6 +19,8 @@ def date_picker() -> ui.input:
                     ui.button('Close', on_click=account_creation_menu.close).props('flat')
         with date_input.add_slot('append'):
             ui.icon('edit_calendar').on('click', account_creation_menu.open).classes('cursor-pointer')
+    if initial_value:
+        date_input.value = initial_value.strftime("%Y-%m-%d")
 
     return date_input
 

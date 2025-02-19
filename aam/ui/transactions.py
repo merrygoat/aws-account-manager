@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Iterable
 import nicegui.events
 from nicegui import ui
 
+import aam.utilities
 from aam import utilities
 from aam.models import Account, Person, RechargeRequest, Transaction, MonthlyUsage
 
@@ -17,7 +18,6 @@ class UITransactions:
     def __init__(self, parent: "UIMainForm"):
         self.parent = parent
 
-        self.new_request_dialog = UINewRechargeDialog(self)
         self.new_transaction_dialog = UINewSingleTransactionDialog(self)
 
         ui.label("Account transactions").classes("text-4xl")
@@ -124,6 +124,8 @@ class UIRechargeRequests:
     def __init__(self, parent: UITransactions):
         self.parent = parent
 
+        self.new_request_dialog = UINewRechargeDialog(self)
+
         ui.label("Recharge Requests").classes("text-4xl")
         self.recharge_request_grid = ui.aggrid({
             'columnDefs': [{"headerName": "request_id", "field": "id", "hide": True},
@@ -137,7 +139,7 @@ class UIRechargeRequests:
             'stopEditingWhenCellsLoseFocus': True,
         })
         with ui.row():
-            self.add_request_button = ui.button("Add new request", on_click=self.parent.new_request_dialog.open)
+            self.add_request_button = ui.button("Add new request", on_click=self.new_request_dialog.open)
             self.delete_selected_request_button = ui.button("Delete selected request", on_click=self.delete_selected_request)
             self.export_recharge_button = ui.button("Export selected request", on_click=self.export_recharge_request)
 
@@ -393,19 +395,39 @@ class UINewSingleTransactionDialog:
         self.exchange_rate_label.set_visibility(not pound)
         self.exchange_rate.set_visibility(not pound)
 
+
 class UINewRechargeDialog:
-    def __init__(self, parent: UITransactions):
+    def __init__(self, parent: UIRechargeRequests):
         self.parent = parent
         with ui.dialog() as self.dialog:
             with ui.card():
                 ui.label("New recharge request").classes("text-2xl")
                 with ui.grid(columns="auto auto"):
                     ui.label("Date")
-                    self.date_input = utilities.date_picker()
+                    self.date_input = utilities.date_picker(datetime.date.today())
                     ui.label("Reference")
                     self.reference_input = ui.input(validation={"Must provide reference": lambda value: len(value) > 1})
+                    ui.label("Auto populate recharges")
+                    self.auto_populate = ui.switch(value=False)
+                    with ui.row():
+                        ui.label("Start month")
+                        self.start_month = utilities.month_select()
+                    with ui.row():
+                        ui.label("Start year")
+                        self.start_year = utilities.year_select()
+                    with ui.row():
+                        ui.label("End month")
+                        self.end_month = utilities.month_select()
+                    with ui.row():
+                        ui.label("End year")
+                        self.end_year = utilities.year_select()
                     ui.button("Add", on_click=self.new_recharge_request)
                     ui.button("Cancel", on_click=self.dialog.close)
+
+        self.start_month.bind_enabled_from(self.auto_populate, "value")
+        self.start_year.bind_enabled_from(self.auto_populate, "value")
+        self.end_month.bind_enabled_from(self.auto_populate, "value")
+        self.end_year.bind_enabled_from(self.auto_populate, "value")
 
     def open(self):
         self.dialog.open()
@@ -414,11 +436,52 @@ class UINewRechargeDialog:
         self.dialog.close()
 
     def new_recharge_request(self, event: nicegui.events.ClickEventArguments):
+        if self.auto_populate.value is True:
+            start_month_code = aam.utilities.month_code(self.start_year.value, self.start_month.value)
+            end_month_code = aam.utilities.month_code(self.end_year.value, self.end_month.value)
+            if end_month_code < start_month_code:
+                ui.notify("End month must be after start month.")
+                return 0
+
         if self.reference_input.value != "":
-            RechargeRequest.create(date=datetime.date.fromisoformat(self.date_input.value),
-                                   reference=self.reference_input.value, status="Draft")
-            ui.notify("New recharge request added")
-            self.parent.ui_recharge_requests.populate_request_grid()
-            self.close()
+            recharge_request = RechargeRequest.create(date=datetime.date.fromisoformat(self.date_input.value),
+                                                      reference=self.reference_input.value, status="Draft")
         else:
             ui.notify("Must provide a reference")
+            return 0
+
+        if self.auto_populate.value is True:
+            self.add_recharges_to_request(start_month_code, end_month_code, recharge_request)
+
+        ui.notify("New recharge request added")
+        self.parent.parent.ui_recharge_requests.populate_request_grid()
+        self.close()
+
+    @staticmethod
+    def add_recharges_to_request(start_month_code: int, end_month_code: int, recharge_request: RechargeRequest):
+        """Find any Transaction or MonthlyUsage between the start of `start_month` and the end of `end_month` and
+        add them to the recharge request."""
+        start_date = aam.utilities.date_from_month_code(start_month_code)
+        end_date = aam.utilities.date_from_month_code(end_month_code + 1)
+        transactions: Iterable[Transaction] = (Transaction.select(Transaction, Account)
+                                               .join(Account)
+                                               .where((Account.is_recharged == True) & (Transaction.date > start_date) & (Transaction.date < end_date)))
+        for transaction in transactions:
+            if not transaction.recharge_request:
+                transaction.recharge_request = recharge_request.id
+                transaction.save()
+            else:
+                ui.notify(
+                    f"Transaction for account: {transaction.account.name}, date: {transaction.date} is already assigned to another recharge.")
+
+        usage = (MonthlyUsage.select(MonthlyUsage, Account)
+                 .join(Account)
+                 .where(
+            (Account.is_recharged == True) & (MonthlyUsage.month_id >= start_month_code) & (MonthlyUsage.month_id <= end_month_code)))
+        for month_usage in usage:
+            if not month_usage.recharge_request:
+                month_usage.recharge_request = recharge_request.id
+                month_usage.save()
+            else:
+                ui.notify(
+                    f"MonthlyUsage for account: {month_usage.account.name}, date: {month_usage.date} is already assigned to another recharge.")
