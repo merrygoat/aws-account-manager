@@ -107,11 +107,14 @@ class UITransactions:
             transaction: MonthlyUsage = MonthlyUsage.get(id=transaction_id)
         else:
             transaction: Transaction = Transaction.get(id=transaction_id)
-        try:
-            amount = decimal.Decimal(event.args["data"]["amount"])
-        except decimal.InvalidOperation:
-            ui.notify("Invalid amount for transaction - must be a number")
-            return 0
+        if event.args["data"]["amount"]:
+            try:
+                amount = decimal.Decimal(event.args["data"]["amount"])
+            except decimal.InvalidOperation:
+                ui.notify("Invalid amount for transaction - must be a number")
+                return 0
+        else:
+            amount = None
         transaction.amount = amount
         transaction.save()
         self.update_transaction_grid()
