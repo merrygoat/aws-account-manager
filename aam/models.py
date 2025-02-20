@@ -87,8 +87,8 @@ class Account(BaseModel):
     def get_monthly_usage_details(self) -> list[dict]:
         """Returns a list of dicts describing MonthlyUsage between the account creation date and the account
         closure date"""
-        required_months = aam.utilities.get_months_between(self.creation_date, self.final_date())
-        self._check_missing_monthly_transactions(required_months)
+        required_months = aam.utilities.get_months_between(self.creation_date, self.final_date)
+        self.check_missing_monthly_transactions(required_months)
 
         # MonthlyUsage.to_json uses Month and RechargeRequest.reference
         usage: Iterable[MonthlyUsage] = (
@@ -99,7 +99,7 @@ class Account(BaseModel):
 
         return [monthly_usage.to_json() for monthly_usage in usage]
 
-    def _check_missing_monthly_transactions(self, required_months: list[int]):
+    def check_missing_monthly_transactions(self, required_months: list[int]):
         """Accounts should have a usage transaction for each month the account is open. This function checks if the
         account has 'monthly' type transactions for each month code in `required_months`."""
         usage: Iterable[MonthlyUsage] = (MonthlyUsage.select(MonthlyUsage.month_id)
@@ -111,6 +111,7 @@ class Account(BaseModel):
             for month_code in missing_months:
                 MonthlyUsage.create(account=self.id, month=month_code)
 
+    @property
     def final_date(self) -> datetime.date:
         """Return the final date on which the account is active."""
         if self.closure_date:
