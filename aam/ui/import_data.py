@@ -20,7 +20,7 @@ class UIImport:
         ui.html("Import data").classes("text-xl")
         self.import_type = ui.select({1: "Monthly Usage - One month, multiple account", 2:"Monthly usage - One account, multiple months", 3:"Exchange Rate", 4:"Account Details"},
                                      label="Import Type", value=1, on_change=self.import_type_selected)
-        self.description = ui.label("")
+        self.description = ui.label("").style('white-space: pre-wrap')
         with ui.grid(columns="auto auto").classes("place-items-center gap-1") as self.date_pick_grid:
             ui.label("Month")
             ui.label("Year")
@@ -41,9 +41,11 @@ class UIImport:
             self.date_pick_grid.set_visibility(True)
         elif import_type == 2:
             self.description.text = ('Data must be tab delimited in the format, "Month-year   amount ($)", with one '
-                                     'month per line and the account number on its own on the first line.')
-            self.description.text = ('Data before 01/07/24 is imported as gross values and after this date as net '
-                                     'values.')
+                                     'month per line and the account number on its own on the first line.\n'
+                                     'Data before 01/07/24 is imported as gross values and after this date as net '
+                                     'values.'
+                                     )
+            self.description.text = ()
             self.date_pick_grid.set_visibility(False)
         elif import_type == 3:
             self.description.text = ('Data must be in the format, "Month-year, exchange_rate", with one month per line.'
@@ -176,18 +178,20 @@ class UIImport:
             # Ignore any blank lines
             if not line:
                 continue
+            # Remove any dollar symbols
+            line = line.replace("$", "")
             line = line.split("\t")
             # Remove any thousands comma delimiters
             line[1] = line[1].replace(",", "")
             try:
                 datetime.datetime.strptime(line[0], "%b-%y").date()
             except ValueError:
-                ui.notify(f"Malformed date on line {index + 1}")
+                ui.notify(f"Malformed date on line {index + 2}")
                 return 0
             try:
                 decimal.Decimal(line[1])
             except decimal.InvalidOperation:
-                ui.notify(f"Malformed amount on line {index + 1}")
+                ui.notify(f"Malformed amount on line {index + 2}")
                 return 0
             processed_lines.append(line)
 
