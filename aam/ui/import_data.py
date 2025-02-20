@@ -160,58 +160,78 @@ class UIImport:
         ui.notify("Monthly Usage added to accounts.")
 
     def import_account_monthly_usage(self, data: str):
+        """Import multiple months of data for one or more accounts."""
         data = data.split("\n")
 
         valid_account_numbers = [account.id for account in Account.select(Account.id)]
 
-        account_number = data.pop(0)
-        if len(account_number) != 12:
-            ui.notify(f"Malformed account number on line 1 - must be 12 characters")
-            return 0
-        if account_number not in valid_account_numbers:
-            ui.notify(f"Account number {account_number} at line 1 not found in database.")
-            return 0
+        account_numbers = data.pop(0).split("\t")
+        num_columns = len(account_numbers)
+
+        # Go through the account numbers checking their validity
+        # Skip the first value as it is a label
+        for index in range(1, len(account_numbers)):
+            account_number = account_numbers[index]
+            if len(account_number) != 12:
+                ui.notify(f"Malformed account number '{account_number}', on line 1, column {index + 2} - must be 12 digits")
+                return 0
+            if account_number not in valid_account_numbers:
+                ui.notify(f"Account number '{account_number}' at line 1, column {index + 2} not found in database.")
+                return 0
 
         # Check all lines for validity before adding anything to the database.
         processed_lines = []
-        for index, line in enumerate(data):
+        for line_number, line in enumerate(data):
             # Ignore any blank lines
             if not line:
                 continue
             # Remove any dollar symbols
             line = line.replace("$", "")
-            line = line.split("\t")
             # Remove any thousands comma delimiters
-            line[1] = line[1].replace(",", "")
+            line = line.replace(",", "")
+            # Split line
+            line = line.split("\t")
+            # Check that the number of values in the line matches the number of columns in the header
+            if len(line) != num_columns:
+                ui.notify(f"Number of columns in line: {line_number + 2} does not match number of columns in header line.")
+                return 0
+            # Check that the date in the first column can be parsed
             try:
                 datetime.datetime.strptime(line[0], "%b-%y").date()
             except ValueError:
-                ui.notify(f"Malformed date on line {index + 2}")
+                ui.notify(f"Malformed date on line {line_number + 2}")
                 return 0
-            try:
-                decimal.Decimal(line[1])
-            except decimal.InvalidOperation:
-                ui.notify(f"Malformed amount on line {index + 2}")
-                return 0
+            # Go through the values in the row checking they can be parsed as numbers
+            for column_index in range(1, num_columns):
+                try:
+                    decimal.Decimal(line[column_index])
+                except decimal.InvalidOperation:
+                    ui.notify(f"Malformed amount '{line[column_index]}' on line {line_number + 2}, column {column_index + 1}")
+                    return 0
             processed_lines.append(line)
 
         for line in processed_lines:
             date = datetime.datetime.strptime(line[0], "%b-%y").date()
             month_code = aam.utilities.month_code(date.year, date.month)
-            amount = decimal.Decimal(line[1])
-            # AWS data from the API comes as gross totals while the breakdowns from Strategic Blue are net.
-            if date < datetime.date(2024, 7, 1):
-                amount = (amount / decimal.Decimal(1.2))
+            for column_index in range(1, num_columns):
+                account_number = account_numbers[column_index]
+                amount = decimal.Decimal(line[column_index])
+                # Skip if usage is zero as this probably means the account was not open at that time
+                if amount == 0:
+                    continue
+                # AWS data from the API comes as gross totals while the breakdowns from Strategic Blue are net.
+                if date < datetime.date(2024, 7, 1):
+                    amount = (amount / decimal.Decimal(1.2))
 
-            usage = MonthlyUsage.get_or_none(account=account_number, month=month_code)
+                usage = MonthlyUsage.get_or_none(account=account_number, month=month_code)
 
-            if not usage:
-                MonthlyUsage.create(account=account_number, amount=amount, is_pound=False)
-            else:
-                usage.amount = amount
-                usage.save()
+                if not usage:
+                    MonthlyUsage.create(account=account_number, month=month_code, amount=amount)
+                else:
+                    usage.amount = amount
+                    usage.save()
         # If the account being imported to is currently visible then update the transactions grid.
-        if self.parent.get_selected_account_id() == account_number:
+        if self.parent.get_selected_account_id() in account_numbers:
             self.parent.transactions.update_transaction_grid()
         ui.notify("Monthly Usage added.")
 

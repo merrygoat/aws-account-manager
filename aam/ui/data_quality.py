@@ -29,7 +29,8 @@ class UIDataQuality:
                                        {"headerName": "Organization", "field": "organization_name"}
                                        ],
                         'rowData': {}})
-                    ui.button("Refresh list", on_click=self.populate_no_open_grid())
+                    ui.button("Refresh list", on_click=self.populate_no_open_grid)
+
                     ui.label("Closed/Suspended accounts with no close date")
                     self.no_close_grid = ui.aggrid({
                         'defaultColDef': {"suppressMovable": True},
@@ -38,18 +39,20 @@ class UIDataQuality:
                                        {"headerName": "Account Status", "field": "account_status"}
                                        ],
                         'rowData': {}})
-                    ui.button("Refresh list", on_click=self.populate_no_close_grid())
+                    ui.button("Refresh list", on_click=self.populate_no_close_grid)
 
             with ui.tab_panel(tab_two):
                 with ui.column().classes('w-full no-wrap'):
                     ui.html("Accounts Missing Monthly Usage").classes("text-2xl")
                     self.missing_usage = ui.aggrid({
                         'defaultColDef': {"suppressMovable": True},
-                        'columnDefs': [{"headerName": "Account", "field": "account_name", "sort": "desc"},
+                        'columnDefs': [{"headerName": "Account", "field": "account_name"},
+                                       {"headerName": "Account ID", "field": "account_id", "sort": "asc"},
                                        {"headerName": "Organization", "field": "organization_name"},
                                        {"headerName": "Number of Months Missing", "field": "num_months"},
                                        {"headerName": "Missing Months", "field": "missing_months"}
                                        ],
+                        'rowSelection': 'multiple',
                         'rowData': {}})
                     ui.button("Refresh list", on_click=self.populate_missing_usage_grid)
 
@@ -91,9 +94,9 @@ class UIDataQuality:
                 num_months = len(list(missing_usage_months))
                 if num_months > 0:
                     missing_months = ", ".join([month.date.strftime("%b-%Y") for month in missing_usage_months])
-                    account_summaries.append({"account_name": account.name, "organization_name": account.organization.name,
-                                              "num_months": num_months,
-                                              "missing_months": missing_months})
+                    account_summaries.append({"account_name": account.name, "account_id": account.id,
+                                              "organization_name": account.organization.name,
+                                              "num_months": num_months, "missing_months": missing_months})
 
         self.missing_usage.options["rowData"] = account_summaries
         self.missing_usage.update()

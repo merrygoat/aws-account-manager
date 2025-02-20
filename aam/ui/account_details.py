@@ -114,6 +114,9 @@ class UIAccountDetails:
             except ValueError as e:
                 ui.notify(f"Account creation date is not valid: {e.args[0]}")
                 return 0
+            if account_creation_date < datetime.date(2021,1,1):
+                ui.notify(f"Can not set date before 1st Jan 2021.")
+                return 0
             else:
                 account.creation_date = account_creation_date
 
