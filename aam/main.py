@@ -12,11 +12,13 @@ from aam.ui.account_details import UIAccountDetails
 from aam.ui.account_select import UIAccountSelect
 from aam.ui.people import UIPeople
 from aam.ui.shared_charges import UISharedCharges
+from aam.utilities import load_icon
 
 import logging
 logger = logging.getLogger('peewee')
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.DEBUG)
+
 
 @ui.page('/')
 def main():
@@ -24,11 +26,14 @@ def main():
 
     UIMainForm()
     app.on_exception(lambda e: ui.notify(f"Exception: {e}"))
-    ui.run()
+    favicon = load_icon()
+    ui.run(favicon=favicon)
 
 
 class UIMainForm:
     def __init__(self):
+        ui.page_title("AWS Account Manager")
+
         self._selected_organization_id: Optional[str] = None
         self._selected_account_id: Optional[int] = None
 
