@@ -203,11 +203,12 @@ class UIImport:
                 return 0
             # Go through the values in the row checking they can be parsed as numbers
             for column_index in range(1, num_columns):
-                try:
-                    decimal.Decimal(line[column_index])
-                except decimal.InvalidOperation:
-                    ui.notify(f"Malformed amount '{line[column_index]}' on line {line_number + 2}, column {column_index + 1}")
-                    return 0
+                if line[column_index] != "-":
+                    try:
+                        decimal.Decimal(line[column_index])
+                    except decimal.InvalidOperation:
+                        ui.notify(f"Malformed amount '{line[column_index]}' on line {line_number + 2}, column {column_index + 1}")
+                        return 0
             processed_lines.append(line)
 
         for line in processed_lines:
@@ -215,10 +216,10 @@ class UIImport:
             month_code = aam.utilities.month_code(date.year, date.month)
             for column_index in range(1, num_columns):
                 account_number = account_numbers[column_index]
-                amount = decimal.Decimal(line[column_index])
-                # Skip if usage is zero as this probably means the account was not open at that time
-                if amount == 0:
+                # Skip if usage is a hyphen as this indicates that the account was not open at that time
+                if line[column_index] == "-":
                     continue
+                amount = decimal.Decimal(line[column_index])
                 # AWS data from the API comes as gross totals while the breakdowns from Strategic Blue are net.
                 if date < datetime.date(2024, 7, 1):
                     amount = (amount / decimal.Decimal(1.2))

@@ -107,7 +107,7 @@ class UITransactions:
             transaction: MonthlyUsage = MonthlyUsage.get(id=transaction_id)
         else:
             transaction: Transaction = Transaction.get(id=transaction_id)
-        if event.args["data"]["amount"]:
+        if event.args["data"]["amount"] is not None:
             try:
                 amount = decimal.Decimal(event.args["data"]["amount"])
             except decimal.InvalidOperation:
