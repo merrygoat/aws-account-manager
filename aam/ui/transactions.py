@@ -196,7 +196,7 @@ class UIRechargeRequests:
         usage = (MonthlyUsage.select(MonthlyUsage, Account, Person)
                  .join(Account)
                  .join(Person)
-                 .where(Transaction.recharge_request == request_id))
+                 .where(MonthlyUsage.recharge_request == request_id))
 
         transactions = list(transactions)
         transactions.extend(list(usage))
