@@ -189,7 +189,7 @@ class MonthlyUsage(BaseModel):
 
     def to_json(self) -> dict:
         date = aam.utilities.date_from_month_code(self.month_id)
-        details = {"id": self.id, "account_id": self.account_id, "type": "Monthly", "date": date, "amount": self.amount,
+        details = {"id": self.id, "account_id": self.account_id, "type": self.type, "date": date, "amount": self.amount,
                    "shared_charge": self.shared_charges, "support_charge": self.support_charge, "currency": "$",
                    "gross_total_dollar": self.gross_total_dollar, "gross_total_pound": self.gross_total_pound}
         if self.recharge_request:
@@ -197,6 +197,10 @@ class MonthlyUsage(BaseModel):
         else:
             details["recharge_reference"] = "-"
         return details
+
+    @property
+    def type(self) -> str:
+        return "Monthly"
 
     @property
     def date(self) -> datetime.date:

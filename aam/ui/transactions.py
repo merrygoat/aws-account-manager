@@ -50,11 +50,12 @@ class UITransactions:
         ui.separator()
 
         with ui.row().classes('w-full no-wrap'):
-            with ui.column().classes("w-1/3"):
+            with ui.column().classes("w-1/4"):
                 self.ui_recharge_requests = UIRechargeRequests(self)
 
-            with ui.column().classes("w-2/3"):
-                self.ui_request_items = UIRequestItems(self)
+            self.ui_request_items = UIRequestItems(self)
+
+
 
     def initialize(self, account: Account | None):
         """This function is run when an account is selected from the dropdown menu."""
@@ -144,7 +145,6 @@ class UIRechargeRequests:
         with ui.row():
             self.add_request_button = ui.button("Add new request", on_click=self.new_request_dialog.open)
             self.delete_selected_request_button = ui.button("Delete selected request", on_click=self.delete_selected_request)
-            self.export_recharge_button = ui.button("Export selected request", on_click=self.export_recharge_request)
 
         self.recharge_request_grid.on('rowSelected', self.row_selected)
         self.recharge_request_grid.on('cellValueChanged', self.recharge_request_edited)
@@ -227,21 +227,30 @@ class UIRequestItems:
     def __init__(self, parent: UITransactions):
         self.parent = parent
 
-        ui.label("Request items").classes("text-4xl")
-        self.request_items_grid = ui.aggrid({
-            'columnDefs': [{"headerName": "transaction_id", "field": "transaction_id", "hide": True},
-                           {"headerName": "Account", "field": "account_name", "sort": "asc", "sortIndex": 0},
-                           {"headerName": "Date", "field": "date", "sort": "asc", "sortIndex": 1},
-                           {"headerName": "Type", "field": "type"},
-                           {"headerName": "Amount (£)", "field": "recharge_amount",
-                            "valueFormatter": "value.toFixed(2)"}],
-            'rowData': {},
-            'rowSelection': 'multiple',
-            'stopEditingWhenCellsLoseFocus': True,
-        })
-        with ui.row():
-            self.add_to_recharge_request_button = ui.button("Add selected transactions to request", on_click=self.add_transaction_to_request)
-            self.remove_recharge_button = ui.button("Remove selected transactions from request", on_click=self.remove_transaction_from_request)
+        with ui.column().classes("w-1/2"):
+            ui.label("Request items").classes("text-4xl")
+            self.request_items_grid = ui.aggrid({
+                'columnDefs': [{"headerName": "transaction_id", "field": "transaction_id", "hide": True},
+                               {"headerName": "Account", "field": "account_name", "sort": "asc", "sortIndex": 0},
+                               {"headerName": "Date", "field": "date", "sort": "asc", "sortIndex": 1},
+                               {"headerName": "Type", "field": "type"},
+                               {"headerName": "Amount (£)", "field": "recharge_amount",
+                                "valueFormatter": "value.toFixed(2)"}],
+                'rowData': {},
+                'rowSelection': 'multiple',
+                'stopEditingWhenCellsLoseFocus': True,
+            })
+            with ui.row():
+                self.add_to_recharge_request_button = ui.button("Add selected transactions to request", on_click=self.add_transaction_to_request)
+                self.remove_recharge_button = ui.button("Remove selected transactions from request", on_click=self.remove_transaction_from_request)
+
+        with ui.column().classes("w-1/4"):
+            ui.label("Request summary").classes("text-4xl")
+            self.request_summary_grid = ui.aggrid({
+                'columnDefs': [{"headerName": "Account", "field": "account_name", "sort": "asc", "sortIndex": 0},
+                               {"headerName": "Amount (£)", "field": "recharge_amount", "valueFormatter": "value.toFixed(2)"}],
+                'rowData': {}
+            })
 
     def update_request_items_grid(self, request_id: int | None):
         if request_id is None:
@@ -254,15 +263,26 @@ class UIRequestItems:
                                          .join(Account)
                                          .where(MonthlyUsage.recharge_request == request_id))
 
+        # For the properties exposed in the grid we can treat Transactions and MonthlyUsage as the same type of object.
+        items = list(transactions)
+        items.extend(list(monthly_usage))
+
         recharges_list = []
-        for transaction in transactions:
-            recharges_list.append({"transaction_id": transaction.id, "account_name": f"{transaction.account.name} - {transaction.account}",
-                                   "date": transaction.date, "type": transaction.type, "recharge_amount": transaction.gross_total_pound})
-        for usage in monthly_usage:
-            recharges_list.append({"transaction_id": usage.id, "account_name": f"{usage.account.name} - {usage.account}",
-                                   "date": usage.date, "type": "Monthly", "recharge_amount": usage.gross_total_pound})
+        account_totals = {}
+
+        for item in items:
+            recharges_list.append({"transaction_id": item.id, "account_name": f"{item.account.name} - {item.account}",
+                                   "date": item.date, "type": item.type, "recharge_amount": item.gross_total_pound})
+            if item.account.name not in account_totals:
+                account_totals[item.account.name] = 0
+            account_totals[item.account.name] += item.gross_total_pound
+        # Unfold dict into form that aggrid likes
+        account_totals = [{"account_name": key, "recharge_amount": value} for key, value in account_totals.items()]
+
         self.request_items_grid.options["rowData"] = recharges_list
         self.request_items_grid.update()
+        self.request_summary_grid.options["rowData"] = account_totals
+        self.request_summary_grid.update()
 
     async def add_transaction_to_request(self, event: nicegui.events.ClickEventArguments):
         """Get selected Transactions and MonthlyUsage and add them to the recharge request."""
@@ -346,7 +366,7 @@ class UINewSingleTransactionDialog:
                     ui.label("Date")
                     self.date_input = utilities.date_picker()
                     ui.label("Type")
-                    self.type = ui.select(options=["Savings Plan", "Pre-pay", "Adjustment"]).classes("q-field--dense")
+                    self.type = ui.select(options=["Savings Plan", "Pre-pay", "Adjustment", "Recharge"]).classes("q-field--dense")
                     ui.label("Currency")
                     self.currency_toggle = ui.radio(["Pound", "Dollar"], value="Pound", on_change=self.change_currency).props('inline')
                     ui.label("Amount")
