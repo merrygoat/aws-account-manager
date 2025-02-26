@@ -46,6 +46,7 @@ class Account(BaseModel):
     id = peewee.CharField(primary_key=True)
     name = peewee.CharField()
     organization = peewee.ForeignKeyField(Organization, backref='accounts', null=True)
+    organization_id: int  # Direct access to organization primary key
     email = peewee.CharField()
     status = peewee.CharField()   # ACTIVE, SUSPENDED or Closed
     budget_holder = peewee.ForeignKeyField(Person, backref="budget_holder", null=True)

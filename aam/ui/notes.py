@@ -69,7 +69,7 @@ class UIAccountNotes:
 class AddNoteDialog:
     def __init__(self, parent: "UIAccountNotes"):
         self.parent = parent
-        self.selected_account_id: int | None = None
+        self.selected_account_id: str | None = None
 
         with ui.dialog() as self.dialog:
             with ui.card():
@@ -97,7 +97,7 @@ class AddNoteDialog:
         self.parent.update_note_grid()
         ui.notify("New Note saved.")
 
-    def open(self, selected_account: int):
+    def open(self, selected_account: str):
         self.selected_account_id = selected_account
         self.dialog.open()
 

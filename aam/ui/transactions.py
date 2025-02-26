@@ -232,6 +232,7 @@ class UIRequestItems:
             self.request_items_grid = ui.aggrid({
                 'columnDefs': [{"headerName": "transaction_id", "field": "transaction_id", "hide": True},
                                {"headerName": "Account", "field": "account_name", "sort": "asc", "sortIndex": 0},
+                               {"headerName": "Account ID", "field": "account_id"},
                                {"headerName": "Date", "field": "date", "sort": "asc", "sortIndex": 1},
                                {"headerName": "Type", "field": "type"},
                                {"headerName": "Amount (£)", "field": "recharge_amount",
@@ -247,10 +248,19 @@ class UIRequestItems:
         with ui.column().classes("w-1/4"):
             ui.label("Request summary").classes("text-4xl")
             self.request_summary_grid = ui.aggrid({
-                'columnDefs': [{"headerName": "Account", "field": "account_name", "sort": "asc", "sortIndex": 0},
+                'columnDefs': [{"headerName": "Account ID", "field": "account_id", "hide": True},
+                               {"headerName": "Account", "field": "account_name", "sort": "asc", "sortIndex": 0},
                                {"headerName": "Amount (£)", "field": "recharge_amount", "valueFormatter": "value.toFixed(2)"}],
                 'rowData': {}
             })
+
+        self.request_items_grid.on("cellDoubleClicked", self.cell_clicked)
+        self.request_summary_grid.on("cellDoubleClicked", self.cell_clicked)
+
+    def cell_clicked(self, event: nicegui.events.GenericEventArguments):
+        account: Account = Account.get(Account.id == event.args["data"]["account_id"])
+        self.parent.parent.change_selected_organization(account.organization_id)
+        self.parent.parent.change_selected_account(account.id)
 
     def update_request_items_grid(self, request_id: int | None):
         if request_id is None:
@@ -271,17 +281,17 @@ class UIRequestItems:
         account_totals = {}
 
         for item in items:
-            recharges_list.append({"transaction_id": item.id, "account_name": f"{item.account.name} - {item.account}",
-                                   "date": item.date, "type": item.type, "recharge_amount": item.gross_total_pound})
+            recharges_list.append({"transaction_id": item.id, "account_name": item.account.name,
+                                   "account_id": item.account.id, "date": item.date, "type": item.type,
+                                   "recharge_amount": item.gross_total_pound})
             if item.account.name not in account_totals:
-                account_totals[item.account.name] = 0
-            account_totals[item.account.name] += item.gross_total_pound
-        # Unfold dict into form that aggrid likes
-        account_totals = [{"account_name": key, "recharge_amount": value} for key, value in account_totals.items()]
+                account_totals[item.account.id] = {"account_name": item.account.name, "account_id": item.account.id,
+                                                   "recharge_amount": 0}
+            account_totals[item.account.id]["recharge_amount"] += item.gross_total_pound
 
         self.request_items_grid.options["rowData"] = recharges_list
         self.request_items_grid.update()
-        self.request_summary_grid.options["rowData"] = account_totals
+        self.request_summary_grid.options["rowData"] = list(account_totals.values())
         self.request_summary_grid.update()
 
     async def add_transaction_to_request(self, event: nicegui.events.ClickEventArguments):
@@ -377,7 +387,7 @@ class UINewSingleTransactionDialog:
                     ui.button("Cancel", on_click=self.dialog.close)
         self.set_currency(True)
 
-    def open(self, account_id: int):
+    def open(self, account_id: str | int):
         self.selected_account_id = account_id
         self.dialog.open()
 

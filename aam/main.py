@@ -34,8 +34,10 @@ class UIMainForm:
     def __init__(self):
         ui.page_title("AWS Account Manager")
 
+        # Represents the ID of the organization currently selected in the UIAccountSelect gui element
         self._selected_organization_id: Optional[str] = None
-        self._selected_account_id: Optional[int] = None
+        # Represents the ID of the account currently selected in the UIAccountSelect gui element
+        self._selected_account_id: Optional[str] = None
 
         with ui.row().classes('w-full place-content-center'):
             self.account_select = UIAccountSelect(self)
@@ -68,26 +70,41 @@ class UIMainForm:
                     with ui.tab_panel(self.settings_tab):
                         self.settings = UISettings(self)
 
-        # This has to be called after all UI elements are created as it references some others
+        # This has to be called after all UI elements are created as it references multiple elements
         self.account_select.select_default_org()
 
     def set_selected_organization_id(self, org_id: str | None):
+        """Setter method for selected_account_id instance attribute."""
         self._selected_organization_id = org_id
         self.shared_charges.populate_shared_charges_table()
         self.account_select.update_last_updated_label(org_id)
         self.account_details.populate_account_list()
 
     def get_selected_organization_id(self) -> Optional[str]:
+        """Getter method for selected_account_id instance attribute."""
         return self._selected_organization_id
 
-    def set_selected_account_id(self, account: Account | None):
-        if account:
-            self._selected_account_id = account.id
+    def set_selected_account_id(self, account_id: str | None):
+        """Setter method for selected_account_id instance attribute."""
+        if account_id:
+            self._selected_account_id = account_id
         else:
             self._selected_account_id = None
 
-    def get_selected_account_id(self) -> int | None:
+    def get_selected_account_id(self) -> str | None:
+        """Getter for selected_account_id instance attribute.
+
+        The selected_account_id represents the ID of the organization currently selected in the UIAccountSelect GUI element
+        """
         return self._selected_account_id
+
+    def change_selected_account(self, account_id: str):
+        """Change the account currently selected in the UIAccountSelect GUI element."""
+        self.account_select.account_select.set_value(account_id)
+
+    def change_selected_organization(self, organization_id: str | int):
+        """Change the organization currently selected in the UIAccountSelect GUI element."""
+        self.account_select.organization_select.set_value(organization_id)
 
 
 main()
