@@ -50,12 +50,7 @@ class UITransactions:
         ui.separator()
 
         with ui.row().classes('w-full no-wrap'):
-            with ui.column().classes("w-1/4"):
-                self.ui_recharge_requests = UIRechargeRequests(self)
-
-            self.ui_request_items = UIRequestItems(self)
-
-
+            self.ui_recharge_requests = UIRechargeRequests(self)
 
     def initialize(self, account: Account | None):
         """This function is run when an account is selected from the dropdown menu."""
@@ -88,7 +83,7 @@ class UITransactions:
             self.update_transaction_grid()
             selected_request_row = await(self.ui_recharge_requests.recharge_request_grid.get_selected_row())
             if selected_request_row:
-                self.ui_request_items.update_request_items_grid(selected_request_row["id"])
+                self.ui_recharge_requests.update_request_items_grid(selected_request_row["id"])
             ui.notify("Transaction deleted.")
 
     def update_transaction_grid(self):
@@ -130,21 +125,53 @@ class UIRechargeRequests:
 
         self.new_request_dialog = UINewRechargeDialog(self)
 
-        ui.label("Recharge Requests").classes("text-4xl")
-        self.recharge_request_grid = ui.aggrid({
-            'columnDefs': [{"headerName": "request_id", "field": "id", "hide": True},
-                           {"headerName": "Date", "field": "date", "sort": "asc", "sortIndex": 0},
-                           {"headerName": "Reference", "field": "reference", "editable": True},
-                           {"headerName": "Status", "field": "status", 'editable': True,
-                            'cellEditor': 'agSelectCellEditor',
-                            'cellEditorParams': {'values': ['Draft', 'Submitted', 'Completed']}}],
-            'rowData': {},
-            'rowSelection': 'single',
-            'stopEditingWhenCellsLoseFocus': True,
-        })
-        with ui.row():
-            self.add_request_button = ui.button("Add new request", on_click=self.new_request_dialog.open)
-            self.delete_selected_request_button = ui.button("Delete selected request", on_click=self.delete_selected_request)
+        with ui.column().classes("w-1/4"):
+            ui.label("Recharge Requests").classes("text-4xl")
+            self.recharge_request_grid = ui.aggrid({
+                'columnDefs': [{"headerName": "request_id", "field": "id", "hide": True},
+                               {"headerName": "Date", "field": "date", "sort": "asc", "sortIndex": 0},
+                               {"headerName": "Reference", "field": "reference", "editable": True},
+                               {"headerName": "Status", "field": "status", 'editable': True,
+                                'cellEditor': 'agSelectCellEditor',
+                                'cellEditorParams': {'values': ['Draft', 'Submitted', 'Completed']}}],
+                'rowData': {},
+                'rowSelection': 'single',
+                'stopEditingWhenCellsLoseFocus': True,
+            })
+            with ui.row():
+                self.add_request_button = ui.button("Add new request", on_click=self.new_request_dialog.open)
+                self.delete_selected_request_button = ui.button("Delete selected request", on_click=self.delete_selected_request)
+
+        with ui.column().classes("w-1/2"):
+            ui.label("Request items").classes("text-4xl")
+            self.request_items_grid = ui.aggrid({
+                'columnDefs': [{"headerName": "transaction_id", "field": "transaction_id", "hide": True},
+                               {"headerName": "Account", "field": "account_name", "sort": "asc", "sortIndex": 0},
+                               {"headerName": "Account ID", "field": "account_id"},
+                               {"headerName": "Date", "field": "date", "sort": "asc", "sortIndex": 1},
+                               {"headerName": "Type", "field": "type"},
+                               {"headerName": "Amount (£)", "field": "recharge_amount",
+                                "valueFormatter": "value.toFixed(2)"}],
+                'rowData': {},
+                'rowSelection': 'multiple',
+                'stopEditingWhenCellsLoseFocus': True,
+            })
+            with ui.row():
+                self.add_to_recharge_request_button = ui.button("Add selected transactions to request", on_click=self.add_transaction_to_request)
+                self.remove_recharge_button = ui.button("Remove selected transactions from request", on_click=self.remove_transaction_from_request)
+
+        with ui.column().classes("w-1/4"):
+            ui.label("Request summary").classes("text-4xl")
+            self.request_summary_grid = ui.aggrid({
+                'columnDefs': [{"headerName": "Account ID", "field": "account_id", "hide": True},
+                               {"headerName": "Account", "field": "account_name", "sort": "asc", "sortIndex": 0},
+                               {"headerName": "Amount (£)", "field": "recharge_amount", "valueFormatter": "value.toFixed(2)"}],
+                'rowData': {}
+            })
+
+        self.request_items_grid.on("cellDoubleClicked", self.cell_clicked)
+        self.request_summary_grid.on("cellDoubleClicked", self.cell_clicked)
+
 
         self.recharge_request_grid.on('rowSelected', self.row_selected)
         self.recharge_request_grid.on('cellValueChanged', self.recharge_request_edited)
@@ -152,7 +179,7 @@ class UIRechargeRequests:
 
     def row_selected(self, event: nicegui.events.GenericEventArguments):
         if event.args["selected"] is True:
-            self.parent.ui_request_items.update_request_items_grid(event.args["data"]["id"])
+            self.update_request_items_grid(event.args["data"]["id"])
 
     @staticmethod
     def recharge_request_edited(event: nicegui.events.GenericEventArguments):
@@ -221,41 +248,6 @@ class UIRechargeRequests:
 
         recharge_request = RechargeRequest.get(id=request_id)
         ui.download(bytes(export_string, 'utf-8'), f"{recharge_request.reference} export.txt")
-
-
-class UIRequestItems:
-    def __init__(self, parent: UITransactions):
-        self.parent = parent
-
-        with ui.column().classes("w-1/2"):
-            ui.label("Request items").classes("text-4xl")
-            self.request_items_grid = ui.aggrid({
-                'columnDefs': [{"headerName": "transaction_id", "field": "transaction_id", "hide": True},
-                               {"headerName": "Account", "field": "account_name", "sort": "asc", "sortIndex": 0},
-                               {"headerName": "Account ID", "field": "account_id"},
-                               {"headerName": "Date", "field": "date", "sort": "asc", "sortIndex": 1},
-                               {"headerName": "Type", "field": "type"},
-                               {"headerName": "Amount (£)", "field": "recharge_amount",
-                                "valueFormatter": "value.toFixed(2)"}],
-                'rowData': {},
-                'rowSelection': 'multiple',
-                'stopEditingWhenCellsLoseFocus': True,
-            })
-            with ui.row():
-                self.add_to_recharge_request_button = ui.button("Add selected transactions to request", on_click=self.add_transaction_to_request)
-                self.remove_recharge_button = ui.button("Remove selected transactions from request", on_click=self.remove_transaction_from_request)
-
-        with ui.column().classes("w-1/4"):
-            ui.label("Request summary").classes("text-4xl")
-            self.request_summary_grid = ui.aggrid({
-                'columnDefs': [{"headerName": "Account ID", "field": "account_id", "hide": True},
-                               {"headerName": "Account", "field": "account_name", "sort": "asc", "sortIndex": 0},
-                               {"headerName": "Amount (£)", "field": "recharge_amount", "valueFormatter": "value.toFixed(2)"}],
-                'rowData': {}
-            })
-
-        self.request_items_grid.on("cellDoubleClicked", self.cell_clicked)
-        self.request_summary_grid.on("cellDoubleClicked", self.cell_clicked)
 
     def cell_clicked(self, event: nicegui.events.GenericEventArguments):
         account: Account = Account.get(Account.id == event.args["data"]["account_id"])
@@ -469,6 +461,8 @@ class UINewRechargeDialog:
         self.dialog.close()
 
     def new_recharge_request(self, event: nicegui.events.ClickEventArguments):
+        start_month_code = None
+        end_month_code = None
         if self.auto_populate.value is True:
             start_month_code = aam.utilities.month_code(self.start_year.value, self.start_month.value)
             end_month_code = aam.utilities.month_code(self.end_year.value, self.end_month.value)
