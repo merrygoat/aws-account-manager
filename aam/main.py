@@ -3,7 +3,6 @@ from typing import Optional
 from nicegui import ui, app
 
 from aam import initialization
-from aam.models import Account
 from aam.ui.data_quality import UIDataQuality
 from aam.ui.transactions import UITransactions
 from aam.ui.import_data import UIImport

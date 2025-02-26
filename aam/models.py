@@ -263,10 +263,10 @@ class Transaction(BaseModel):
                        "amount": self.amount}
         if self.is_pound:
             # Accounts are settled in pounds so there is no reason to convert a pound transaction to a dollar value
-            transaction.update({"currency": "£", "support_charge": "-", "shared_charge": "-", "gross_total_dollar": "-",
+            transaction.update({"currency": "£", "support_charge": "", "shared_charge": "", "gross_total_dollar": "",
                                 "gross_total_pound": self.gross_total_pound})
         else:
-            transaction.update({"currency": "$", "support_charge": 0, "exchange_rate": self.exchange_rate,
+            transaction.update({"currency": "$", "support_charge": "", "exchange_rate": self.exchange_rate,
                                 "gross_total_dollar": self.gross_total_dollar,
                                 "gross_total_pound": self.gross_total_pound})
 
