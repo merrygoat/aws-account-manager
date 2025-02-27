@@ -8,7 +8,7 @@ from nicegui import ui
 
 import aam.utilities
 from aam import utilities
-from aam.models import Account, Person, RechargeRequest, Transaction, MonthlyUsage
+from aam.models import Account, Person, RechargeRequest, Transaction, MonthlyUsage, TRANSACTION_TYPES
 
 if TYPE_CHECKING:
     from aam.main import UIMainForm
@@ -20,7 +20,7 @@ class UITransactions:
 
         self.new_transaction_dialog = UINewSingleTransactionDialog(self)
 
-        ui.label("Account transactions").classes("text-4xl")
+        ui.label("Account Transaction Journal").classes("text-4xl")
         self.transaction_grid = ui.aggrid({
             'defaultColDef': {"suppressMovable": True, "sortable": False},
             'columnDefs': [{"headerName": "id", "field": "id", "hide": True},
@@ -382,7 +382,7 @@ class UINewSingleTransactionDialog:
                     ui.label("Date")
                     self.date_input = utilities.date_picker()
                     ui.label("Type")
-                    self.type = ui.select(options=["Savings Plan", "Pre-pay", "Adjustment", "Recharge"]).classes("q-field--dense")
+                    self.type = ui.select(options=TRANSACTION_TYPES).classes("q-field--dense")
                     ui.label("Currency")
                     self.currency_toggle = ui.radio(["Pound", "Dollar"], value="Pound", on_change=self.change_currency).props('inline')
                     ui.label("Amount")
@@ -421,8 +421,9 @@ class UINewSingleTransactionDialog:
             exchange_rate = None
             is_pound = True
 
-        Transaction.create(account=self.selected_account_id, type=self.type.value, date=self.date_input.value,
+        transaction = Transaction.create(account=self.selected_account_id, date=self.date_input.value,
                            amount=amount, is_pound=is_pound, _exchange_rate=exchange_rate)
+        transaction.type = self.type.value
         self.parent.update_transaction_grid()
         ui.notify("New transaction added.")
         self.dialog.close()

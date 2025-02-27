@@ -18,6 +18,7 @@ import aam.utilities
 # Pragmas ensures foreign key constraints are enabled - they are disabled by default in SQLite.
 db = peewee.SqliteDatabase('data.db', pragmas={'foreign_keys': 1})
 
+TRANSACTION_TYPES = ["Pre-pay", "Savings Plan", "Adjustment", "Recharge"]
 
 class BaseModel(peewee.Model):
     class Meta:
@@ -251,22 +252,40 @@ class MonthlyUsage(BaseModel):
 class Transaction(BaseModel):
     id = peewee.AutoField()
     account = peewee.ForeignKeyField(Account, backref="transactions")
-    type = peewee.CharField()  # ["Pre-pay", "Savings plan", "Adjustment"]
+    _type: int = peewee.IntegerField(null=True)
     date: datetime.date = peewee.DateField()
     amount: Decimal = peewee.DecimalField(null=True)  # The net value of the transaction
     is_pound = peewee.BooleanField()
     exchange_rate: Decimal = peewee.DecimalField(null=True)   # USD/GBP
     recharge_request = peewee.ForeignKeyField(RechargeRequest, backref="transactions", null=True)
+    note = peewee.CharField(null=True)
+    reference = peewee.CharField(null=True)
+    project_code = peewee.CharField(null=True)
+    task_code = peewee.CharField(null=True)
+
+    @property
+    def type(self):
+        if self._type < len(TRANSACTION_TYPES):
+            return TRANSACTION_TYPES[self._type]
+        else:
+            raise TypeError(f"Error getting Transaction type: Unknown transaction type: '{self._type}'")
+
+    @type.setter
+    def type(self, value: str):
+        if value in TRANSACTION_TYPES:
+            self._type = TRANSACTION_TYPES.index(value)
+        else:
+            raise TypeError(f"Error setting Transaction type: Unknown transaction type: '{value}'")
 
     def to_json(self) -> dict:
         transaction = {"id": self.id, "account_id": self.account.id, "type": self.type, "date": self.date,
-                       "amount": self.amount}
+                       "amount": self.amount, "note": self.note, "reference": self.reference,
+                       "project_code": self.project_code, "task_code": self.task_code}
         if self.is_pound:
             # Accounts are settled in pounds so there is no reason to convert a pound transaction to a dollar value
-            transaction.update({"currency": "£", "support_charge": "", "shared_charge": "", "gross_total_dollar": "",
-                                "gross_total_pound": self.gross_total_pound})
+            transaction.update({"currency": "£", "gross_total_pound": self.gross_total_pound})
         else:
-            transaction.update({"currency": "$", "support_charge": "", "exchange_rate": self.exchange_rate,
+            transaction.update({"currency": "$", "exchange_rate": self.exchange_rate,
                                 "gross_total_dollar": self.gross_total_dollar,
                                 "gross_total_pound": self.gross_total_pound})
 
