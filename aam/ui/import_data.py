@@ -1,6 +1,6 @@
 import datetime
 import decimal
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 import re
 
 import nicegui.events

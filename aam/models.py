@@ -277,9 +277,8 @@ class Transaction(BaseModel):
             raise TypeError(f"Error setting Transaction type: Unknown transaction type: '{value}'")
 
     def to_json(self) -> dict:
-        transaction = {"id": self.id, "account_id": self.account.id, "type": self.type, "amount": self.amount,
-                       "note": self.note, "reference": self.reference, "project_code": self.project_code,
-                       "task_code": self.task_code}
+        transaction = {"id": self.id, "account_id": self.account.id, "type": self.type, "note": self.note,
+                       "reference": self.reference, "project_code": self.project_code, "task_code": self.task_code}
         if self.nominal_date:
             transaction["date"] = self.nominal_date
         else:
@@ -288,7 +287,7 @@ class Transaction(BaseModel):
             # Accounts are settled in pounds so there is no reason to convert a pound transaction to a dollar value
             transaction.update({"currency": "£", "gross_total_pound": self.gross_total_pound})
         else:
-            transaction.update({"currency": "$", "exchange_rate": self.exchange_rate,
+            transaction.update({"currency": "$", "exchange_rate": self.exchange_rate, "amount": self.amount,
                                 "gross_total_dollar": self.gross_total_dollar,
                                 "gross_total_pound": self.gross_total_pound})
 

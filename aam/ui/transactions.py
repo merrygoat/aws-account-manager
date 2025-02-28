@@ -24,7 +24,7 @@ class UITransactions:
         self.transaction_grid = ui.aggrid({
             'defaultColDef': {"suppressMovable": True, "sortable": False},
             'columnDefs': [{"headerName": "id", "field": "id", "hide": True},
-                           {"headerName": "Date", "field": "date"},
+                           {"headerName": "Date", "field": "date", "editable": True},
                            {"headerName": "Type", "field": "type"},
                            {"headerName": "Currency", "field": "currency", "editable": True},
                            {"headerName": "Net Amount", "field": "amount", "editable": True,
@@ -39,7 +39,7 @@ class UITransactions:
                             "valueFormatter": 'value ? value.toFixed(2) : ""'},
                            {"headerName": "Running Total (£)", "field": "running_total",
                             "valueFormatter": 'value ? value.toFixed(2) : ""'},
-                           {"headerName": "Reference", "field": "reference"},
+                           {"headerName": "Reference", "field": "reference", "editable": True},
                            {"headerName": "Note", "field": "note", "editable": True}],
             'rowData': {},
             'rowSelection': 'multiple',
@@ -108,25 +108,57 @@ class UITransactions:
         self.transaction_grid.update()
 
     def update_transaction(self, event: nicegui.events.GenericEventArguments):
+        """Called when the value of a cell in the transaction grid is changed."""
+        if not self._validate_cell_change(event):
+            return 0
+
         transaction_id = event.args["data"]["id"]
         transaction_type = event.args["data"]["type"]
+        cell_edited = event.args["colId"]
+
         if transaction_type == "Monthly":
             transaction: MonthlyUsage = MonthlyUsage.get(id=transaction_id)
         else:
             transaction: Transaction = Transaction.get(id=transaction_id)
-        if event.args["data"]["amount"] is not None:
-            try:
-                amount = decimal.Decimal(event.args["data"]["amount"])
-            except decimal.InvalidOperation:
-                ui.notify("Invalid amount for transaction - must be a number")
-                return 0
-        else:
-            amount = None
-        transaction.amount = amount
-        if "note" in event.args["data"]:
+
+        if cell_edited == "date":
+            transaction.date =  event.args["data"]["date"]
+        elif cell_edited == "amount":
+            amount = event.args["data"]["amount"]
+            if amount is not None:
+                amount = decimal.Decimal(amount)
+            transaction.amount = amount
+        elif cell_edited == "reference":
+            transaction.reference = event.args["data"]["reference"]
+        elif cell_edited == "note":
             transaction.note = event.args["data"]["note"]
         transaction.save()
         self.update_transaction_grid()
+
+    def _validate_cell_change(self, event: nicegui.events.GenericEventArguments) -> bool:
+        """Validate whether a change made to the Transaction gird is valid.
+
+        :param event: The data from the cellValueChanged aggrid event.
+
+        Returns True if change is valid else returns False
+        """
+        # Fields that cannot be edited for MonthlyUsage
+        invalid_monthly_fields = ["date", "reference"]
+        transaction_type = event.args["data"]["type"]
+        cell_edited = event.args["colId"]
+
+        if cell_edited in invalid_monthly_fields and transaction_type == "Monthly":
+            ui.notify(f'Can not change field "{cell_edited}" for "Monthly" type transactions.')
+            self.transaction_grid.run_row_method(event.args['rowId'], 'setDataValue', cell_edited, event.args["oldValue"])
+            return False
+
+        if cell_edited == "amount" and event.args["newValue"] is not None:
+            try:
+                decimal.Decimal(event.args["newValue"])
+            except decimal.InvalidOperation:
+                ui.notify("Invalid amount for transaction - must be a number")
+                self.transaction_grid.run_row_method(event.args['rowId'], 'setDataValue', 'amount', event.args["oldValue"])
+                return False
 
     async def get_selected_rows(self) -> list[dict]:
         return await(self.transaction_grid.get_selected_rows())
