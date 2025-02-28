@@ -42,6 +42,8 @@ class UITransactions:
                            {"headerName": "Running Total (£)", "field": "running_total",
                             "valueFormatter": 'value.toFixed(2)'},
                            {"headerName": "Reference", "field": "reference", "editable": True},
+                           {"headerName": "Project Code", "field": "project_code", "editable": True},
+                           {"headerName": "Task Code", "field": "task_code", "editable": True},
                            {"headerName": "Note", "field": "note", "editable": True}],
             'rowData': {},
             'rowSelection': 'multiple',
@@ -132,6 +134,10 @@ class UITransactions:
             if amount is not None:
                 amount = decimal.Decimal(amount)
             transaction.amount = amount
+        elif cell_edited == "project_code":
+            transaction.project_code = event.args["data"]["project_code"]
+        elif cell_edited == "task_code":
+            transaction.task_code = event.args["data"]["task_code"]
         elif cell_edited == "reference":
             transaction.reference = event.args["data"]["reference"]
         elif cell_edited == "note":
@@ -152,7 +158,7 @@ class UITransactions:
             return False
 
         # Fields that cannot be edited for MonthlyUsage
-        invalid_monthly_fields = ["date", "reference"]
+        invalid_monthly_fields = ["date", "reference", "project_code", "task_code"]
         transaction_type = event.args["data"]["type"]
         cell_edited = event.args["colId"]
 
