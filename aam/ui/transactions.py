@@ -39,7 +39,8 @@ class UITransactions:
                             "valueFormatter": 'value ? value.toFixed(2) : ""'},
                            {"headerName": "Running Total (£)", "field": "running_total",
                             "valueFormatter": 'value ? value.toFixed(2) : ""'},
-                           {"headerName": "Recharge Reference", "field": "recharge_reference"}],
+                           {"headerName": "Reference", "field": "reference"},
+                           {"headerName": "Note", "field": "note", "editable": True}],
             'rowData': {},
             'rowSelection': 'multiple',
             'stopEditingWhenCellsLoseFocus': True,
@@ -122,6 +123,8 @@ class UITransactions:
         else:
             amount = None
         transaction.amount = amount
+        if "note" in event.args["data"]:
+            transaction.note = event.args["data"]["note"]
         transaction.save()
         self.update_transaction_grid()
 
@@ -290,7 +293,7 @@ class UIRechargeRequests:
             recharges_list.append({"transaction_id": item.id, "account_name": item.account.name,
                                    "account_id": item.account.id, "date": item.date, "type": item.type,
                                    "recharge_amount": item.gross_total_pound})
-            if item.account.name not in account_totals:
+            if item.account.id not in account_totals:
                 account_totals[item.account.id] = {"account_name": item.account.name, "account_id": item.account.id,
                                                    "recharge_amount": 0}
             account_totals[item.account.id]["recharge_amount"] += item.gross_total_pound
@@ -421,9 +424,9 @@ class UINewSingleTransactionDialog:
             exchange_rate = None
             is_pound = True
 
-        transaction = Transaction.create(account=self.selected_account_id, date=self.date_input.value,
-                           amount=amount, is_pound=is_pound, _exchange_rate=exchange_rate)
-        transaction.type = self.type.value
+        Transaction.create(account=self.selected_account_id, date=self.date_input.value,
+                           _type=TRANSACTION_TYPES.index(self.type.value), amount=amount, is_pound=is_pound,
+                           _exchange_rate=exchange_rate)
         self.parent.update_transaction_grid()
         ui.notify("New transaction added.")
         self.dialog.close()

@@ -18,7 +18,7 @@ import aam.utilities
 # Pragmas ensures foreign key constraints are enabled - they are disabled by default in SQLite.
 db = peewee.SqliteDatabase('data.db', pragmas={'foreign_keys': 1})
 
-TRANSACTION_TYPES = ["Pre-pay", "Savings Plan", "Adjustment", "Recharge"]
+TRANSACTION_TYPES = ["Pre-pay", "Savings Plan", "Adjustment", "Recharge", "Starting Balance"]
 
 class BaseModel(peewee.Model):
     class Meta:
@@ -82,7 +82,7 @@ class Account(BaseModel):
         transactions: Iterable[Transaction] = (
             Transaction.select()
             .join(RechargeRequest, JOIN.LEFT_OUTER)
-            .where((Transaction.account == self.id) & (Transaction.date > self.creation_date) & (Transaction.date < end_date))
+            .where((Transaction.account == self.id) & (Transaction.date >= self.creation_date) & (Transaction.date <= end_date))
         )
         return [transaction.to_json() for transaction in transactions]
 
@@ -195,9 +195,7 @@ class MonthlyUsage(BaseModel):
                    "shared_charge": self.shared_charges, "support_charge": self.support_charge, "currency": "$",
                    "gross_total_dollar": self.gross_total_dollar, "gross_total_pound": self.gross_total_pound}
         if self.recharge_request:
-            details["recharge_reference"] = self.recharge_request.reference
-        else:
-            details["recharge_reference"] = "-"
+            details["reference"] = f"Recharge - {self.recharge_request.reference}"
         return details
 
     @property
@@ -252,8 +250,9 @@ class MonthlyUsage(BaseModel):
 class Transaction(BaseModel):
     id = peewee.AutoField()
     account = peewee.ForeignKeyField(Account, backref="transactions")
-    _type: int = peewee.IntegerField(null=True)
+    _type: int = peewee.IntegerField()
     date: datetime.date = peewee.DateField()
+    nominal_date: datetime.date = peewee.DateField(null=True)  # Where the transaction appears in the journal
     amount: Decimal = peewee.DecimalField(null=True)  # The net value of the transaction
     is_pound = peewee.BooleanField()
     exchange_rate: Decimal = peewee.DecimalField(null=True)   # USD/GBP
@@ -278,9 +277,13 @@ class Transaction(BaseModel):
             raise TypeError(f"Error setting Transaction type: Unknown transaction type: '{value}'")
 
     def to_json(self) -> dict:
-        transaction = {"id": self.id, "account_id": self.account.id, "type": self.type, "date": self.date,
-                       "amount": self.amount, "note": self.note, "reference": self.reference,
-                       "project_code": self.project_code, "task_code": self.task_code}
+        transaction = {"id": self.id, "account_id": self.account.id, "type": self.type, "amount": self.amount,
+                       "note": self.note, "reference": self.reference, "project_code": self.project_code,
+                       "task_code": self.task_code}
+        if self.nominal_date:
+            transaction["date"] = self.nominal_date
+        else:
+            transaction["date"] = self.date
         if self.is_pound:
             # Accounts are settled in pounds so there is no reason to convert a pound transaction to a dollar value
             transaction.update({"currency": "£", "gross_total_pound": self.gross_total_pound})
