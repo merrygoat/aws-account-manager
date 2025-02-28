@@ -25,7 +25,9 @@ class UITransactions:
             'defaultColDef': {"suppressMovable": True, "sortable": False},
             'columnDefs': [{"headerName": "id", "field": "id", "hide": True},
                            {"headerName": "Date", "field": "date", "editable": True},
-                           {"headerName": "Type", "field": "type"},
+                           {"headerName": "Type", "field": "type", "editable": True,
+                            "cellEditor": 'agSelectCellEditor',
+                            "cellEditorParams": {"values": TRANSACTION_TYPES}},
                            {"headerName": "Currency", "field": "currency", "editable": True},
                            {"headerName": "Net Amount", "field": "amount", "editable": True,
                             "valueFormatter": 'value.toFixed(2)'},
@@ -122,7 +124,9 @@ class UITransactions:
             transaction: Transaction = Transaction.get(id=transaction_id)
 
         if cell_edited == "date":
-            transaction.date =  event.args["data"]["date"]
+            transaction.nominal_date =  event.args["data"]["date"]
+        elif cell_edited == "type":
+            transaction.type = event.args["data"]["type"]
         elif cell_edited == "amount":
             amount = event.args["data"]["amount"]
             if amount is not None:
@@ -134,6 +138,7 @@ class UITransactions:
             transaction.note = event.args["data"]["note"]
         transaction.save()
         self.update_transaction_grid()
+        ui.notify(f"Transaction {cell_edited} updated.")
 
     def _validate_cell_change(self, event: nicegui.events.GenericEventArguments) -> bool:
         """Validate whether a change made to the Transaction gird is valid.
@@ -142,12 +147,23 @@ class UITransactions:
 
         Returns True if change is valid else returns False
         """
+        # Only change db as a result of callbacks triggered by user, otherwise we can get stuck in a loop.
+        if "source" not in event.args:
+            return False
+
         # Fields that cannot be edited for MonthlyUsage
         invalid_monthly_fields = ["date", "reference"]
         transaction_type = event.args["data"]["type"]
         cell_edited = event.args["colId"]
 
+
+        invalid_change = False
+        if cell_edited == "type" and event.args["oldValue"] == "Monthly":
+            invalid_change = True
         if cell_edited in invalid_monthly_fields and transaction_type == "Monthly":
+            invalid_change = True
+
+        if invalid_change:
             ui.notify(f'Can not change field "{cell_edited}" for "Monthly" type transactions.')
             self.transaction_grid.run_row_method(event.args['rowId'], 'setDataValue', cell_edited, event.args["oldValue"])
             return False
@@ -159,6 +175,7 @@ class UITransactions:
                 ui.notify("Invalid amount for transaction - must be a number")
                 self.transaction_grid.run_row_method(event.args['rowId'], 'setDataValue', 'amount', event.args["oldValue"])
                 return False
+        return True
 
     async def get_selected_rows(self) -> list[dict]:
         return await(self.transaction_grid.get_selected_rows())

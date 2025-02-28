@@ -18,7 +18,7 @@ import aam.utilities
 # Pragmas ensures foreign key constraints are enabled - they are disabled by default in SQLite.
 db = peewee.SqliteDatabase('data.db', pragmas={'foreign_keys': 1})
 
-TRANSACTION_TYPES = ["Pre-pay", "Savings Plan", "Adjustment", "Recharge", "Starting Balance"]
+TRANSACTION_TYPES = ["Pre-pay", "Savings Plan", "Adjustment", "Recharge", "Starting Balance", "Unrecovered spend"]
 
 class BaseModel(peewee.Model):
     class Meta:
@@ -188,12 +188,14 @@ class MonthlyUsage(BaseModel):
     shared_charge: Decimal = peewee.DecimalField(default=0)
     amount: Decimal = peewee.DecimalField(null=True)  # The net value of the usage
     recharge_request = peewee.ForeignKeyField(RechargeRequest, backref="monthly_usage", null=True)
+    note = peewee.CharField(null=True)
 
     def to_json(self) -> dict:
         date = aam.utilities.date_from_month_code(self.month_id)
         details = {"id": self.id, "account_id": self.account_id, "type": self.type, "date": date, "amount": self.amount,
                    "shared_charge": self.shared_charges, "support_charge": self.support_charge, "currency": "$",
-                   "gross_total_dollar": self.gross_total_dollar, "gross_total_pound": self.gross_total_pound}
+                   "gross_total_dollar": self.gross_total_dollar, "gross_total_pound": self.gross_total_pound,
+                   "note": self.note}
         if self.recharge_request:
             details["reference"] = f"Recharge - {self.recharge_request.reference}"
         return details
