@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Iterable
 import nicegui.events
 from nicegui import ui
 
-from aam.models import Account, Organization, MonthlyUsage
+from aam.models import Account, Organization, MonthlyUsage, Transaction
 import aam.utilities
 
 if TYPE_CHECKING:
@@ -18,6 +18,7 @@ class UIDataQuality:
         with ui.tabs().props("align left").classes('w-full') as tabs:
             tab_one = ui.tab("Account Dates")
             tab_two = ui.tab("Monthly Usage")
+            tab_three = ui.tab("Other Transactions")
 
         with ui.tab_panels(tabs, value=tab_one).classes('w-full'):
             with ui.tab_panel(tab_one):
@@ -72,12 +73,27 @@ class UIDataQuality:
                         ui.button("Refresh list", on_click=self.populate_wrong_monthly_usage)
                         ui.button("Delete selected months", on_click=self.delete_selected_monthly_usage)
 
+            with ui.tab_panel(tab_three):
+                with ui.column().classes('w-full no-wrap'):
+                    ui.label("Recharge Transactions without project code").classes("text-2xl")
+                    self.recharges_missing_code_grid = ui.aggrid({
+                        'defaultColDef': {"suppressMovable": True},
+                        'columnDefs': [{"headerName": "Account", "field": "account_name"},
+                                       {"headerName": "Account ID", "field": "account_id", "sort": "asc"},
+                                       {"headerName": "Date", "field": "transaction_date"}
+                                       ],
+                        'rowSelection': 'multiple',
+                        'rowData': {}})
+                    ui.button("Refresh list", on_click=self.populate_recharges_missing_code_grid)
 
             self.populate_no_open_grid()
             self.populate_no_close_grid()
+            self.populate_recharges_missing_code_grid()
 
     def populate_no_open_grid(self):
-        accounts = Account.select().join(Organization).where(Account.creation_date.is_null(True))
+        accounts = (Account.select()
+                    .join(Organization)
+                    .where(Account.creation_date.is_null(True)))
         account_details = [{"account_name": account.name, "organization_name": account.organization.name}
                            for account in accounts]
         self.no_open_grid.options["rowData"] = account_details
@@ -85,11 +101,22 @@ class UIDataQuality:
 
     def populate_no_close_grid(self):
         account_status = ["Closed", "SUSPENDED"]
-        accounts = Account.select().join(Organization).where((Account.status.in_(account_status) & Account.closure_date.is_null(True)))
+        accounts = (Account.select()
+                    .join(Organization)
+                    .where((Account.status.in_(account_status) & Account.closure_date.is_null(True))))
         account_details = [{"account_name": account.name, "organization_name": account.organization.name,
                             "account_status": account.status} for account in accounts]
         self.no_close_grid.options["rowData"] = account_details
         self.no_close_grid.update()
+
+    def populate_recharges_missing_code_grid(self):
+        transactions = (Transaction.select(Transaction, Account.name, Account.id)
+                        .join(Account)
+                        .where((Transaction._type == 3) & (Transaction.project_code.is_null())))
+        transaction_details = [{"account_name": transaction.account.name, "account_id": transaction.account_id,
+                                "transaction_date": transaction.date} for transaction in transactions]
+        self.recharges_missing_code_grid.options["rowData"] = transaction_details
+        self.recharges_missing_code_grid.update()
 
     def populate_missing_usage_grid(self):
         accounts: Iterable[Account] = (Account.select(Account, Organization.name).join(Organization))

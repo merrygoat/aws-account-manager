@@ -481,7 +481,7 @@ class UINewSingleTransactionDialog:
 
         Transaction.create(account=self.selected_account_id, date=self.date_input.value,
                            _type=TRANSACTION_TYPES.index(self.type.value), amount=amount, is_pound=is_pound,
-                           _exchange_rate=exchange_rate)
+                           exchange_rate=exchange_rate)
         self.parent.update_transaction_grid()
         ui.notify("New transaction added.")
         self.dialog.close()
