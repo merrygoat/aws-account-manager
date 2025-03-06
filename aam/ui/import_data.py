@@ -310,30 +310,29 @@ class UIImport:
             # Split the line by tab delimiter
             line = line.split("\t")
             # Remove any pound signs or thousands commas from the amount
-            line[8] = line[8].replace("£", "")
-            line[8] = line[8].replace(",", "")
+            line[7] = line[7].replace("£", "")
+            line[7] = line[7].replace(",", "")
             line[1] = datetime.datetime.strptime(line[1], "%d/%m/%Y").date()
-            line[2] = datetime.datetime.strptime(line[2], "%d/%m/%Y").date()
-            if line[3] not in valid_account_names:
-                ui.notify(f"Account name '{line[3]}' on line {index + 1} not found in database.")
+            if line[2] not in valid_account_names:
+                ui.notify(f"Account name '{line[2]}' on line {index + 1} not found in database.")
                 return 0
-            if line[4] not in TRANSACTION_TYPES:
-                ui.notify(f"Transaction type '{line[4]}' on line {index + 1} not in valid transaction types: '{TRANSACTION_TYPES}'.")
+            if line[3] not in TRANSACTION_TYPES:
+                ui.notify(f"Transaction type '{line[3]}' on line {index + 1} not in valid transaction types: '{TRANSACTION_TYPES}'.")
                 return 0
             try:
                 # Amount is negative because it is a credit to the account
-                line[8] = -decimal.Decimal(line[8])
+                line[7] = -decimal.Decimal(line[7])
             except decimal.InvalidOperation:
                 ui.notify(
-                    f"Malformed amount '{line[8]}' on line {index + 1}")
+                    f"Malformed amount '{line[7]}' on line {index + 1}")
                 return 0
             processed_lines.append(line)
 
         for line in processed_lines:
-            account_id = Account.get(Account.name == line[3]).id
-            transaction_type = TRANSACTION_TYPES.index(line[4])
-            Transaction.create(account=account_id, date=line[1], nominal_date=line[2], amount=line[8], _type=transaction_type,  is_pound=True, note=line[5],
-                               reference=line[0], project_code=line[6], task_code=line[7])
+            account_id = Account.get(Account.name == line[2]).id
+            transaction_type = TRANSACTION_TYPES.index(line[3])
+            Transaction.create(account=account_id, date=line[1], amount=line[7], _type=transaction_type,  is_pound=True, note=line[4],
+                               reference=line[0], project_code=line[5], task_code=line[6])
 
         self.parent.transactions.update_transaction_grid()
         ui.notify("Transactions added.")

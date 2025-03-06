@@ -9,7 +9,6 @@ import datetime
 import decimal
 from decimal import Decimal
 from collections.abc import Iterable
-from typing import TYPE_CHECKING
 
 import peewee
 from peewee import JOIN
@@ -25,6 +24,11 @@ class BaseModel(peewee.Model):
     class Meta:
         database = db
 
+class Organization(BaseModel):
+    id = peewee.CharField(primary_key=True)
+    name = peewee.CharField(null=True)
+    accounts: "Account"  # backref
+    last_updated_time: Iterable["LastAccountUpdate"]  # backref
 
 class Person(BaseModel):
     id = peewee.AutoField()
@@ -38,11 +42,44 @@ class Person(BaseModel):
     def full_name(self) -> str:
         return f"{self.first_name} {self.last_name}"
 
-class Organization(BaseModel):
-    id = peewee.CharField(primary_key=True)
-    name = peewee.CharField(null=True)
-    accounts: "Account"  # backref
-    last_updated_time: Iterable["LastAccountUpdate"]  # backref
+class LastAccountUpdate(BaseModel):
+    id = peewee.IntegerField(primary_key=True)
+    organization = peewee.ForeignKeyField(Organization, backref="last_updated_time")
+    time = peewee.DateTimeField(null=True)
+
+class Month(BaseModel):
+    month_code: int = peewee.IntegerField(primary_key=True)
+    exchange_rate: Decimal = peewee.DecimalField()
+    shared_charges: Iterable["SharedCharge"]  # backref
+
+    @property
+    def year(self) -> int:
+        return aam.utilities.year_from_month_code(self.month_code)
+
+    @property
+    def month(self) -> int:
+        """Months start at 1, e.g. Jan = 1, Feb = 2"""
+        return aam.utilities.month_from_month_code(self.month_code)
+
+    def __repr__(self):
+        return f"Month: {calendar.month_abbr[self.month]}-{self.year}"
+
+    def __str__(self):
+        return f"{calendar.month_abbr[self.month]}-{self.year}"
+
+    def to_date(self):
+        return datetime.date(self.year, self.month, 1)
+
+class RechargeRequest(BaseModel):
+    id = peewee.AutoField()
+    date: datetime.date = peewee.DateField()
+    reference = peewee.CharField()
+    status = peewee.CharField()
+    transactions: Iterable["Transaction"]  # backref
+    monthly_usage: Iterable["MonthlyUsage"]  # backref
+
+    def to_json(self):
+        return {"id": self.id, "date": self.date, "reference": self.reference, "status": self.status}
 
 class Account(BaseModel):
     id = peewee.CharField(primary_key=True)
@@ -61,51 +98,63 @@ class Account(BaseModel):
     notes: Iterable["Note"]  # backref
     transactions: Iterable["Transaction"]  # backref
 
-    def get_transaction_details(self) -> list[dict]:
-        """Returns a list of dicts describing MonthlyUsage and Transactions in the account between the creation date
-        and the account closure date. If the account creation date is not set then return an empty list."""
-        if not self.creation_date:
-            return []
+    def get_transaction_details(self, start_date: datetime.date = None, end_date: datetime.date = None) -> list[dict]:
+        """Returns a list of dicts describing MonthlyUsage and Transactions in the account between `start_date` and
+        `end_date`.
 
-        monthly_usage = self.get_monthly_usage()
-        transaction_details = [monthly_usage.to_json() for monthly_usage in monthly_usage]
-        transactions = self.get_transactions()
-        transaction_details.extend([transaction.to_json() for transaction in transactions])
-        return transaction_details
-
-    def get_transactions(self) -> Iterable["Transaction"]:
-        """Returns a list of Transactions between the account creation date and the account
-        closure date"""
-        if not self.creation_date:
-            return []
-
-        end_date = self.closure_date
-        if not end_date:
-            end_date = datetime.date.today()
-        transactions: Iterable[Transaction] = (
-            Transaction.select()
-            .join(RechargeRequest, JOIN.LEFT_OUTER)
-            .where((Transaction.account == self.id) & (Transaction.date >= self.creation_date) & (Transaction.date <= end_date))
-        )
-        return transactions
-
-    def get_monthly_usage(self, start_date: datetime.date = None, end_date: datetime.date = None) -> Iterable["MonthlyUsage"]:
-        """Returns a list of dicts describing MonthlyUsage between `start_date` and `end_date`.
-
-        :param start_date: The date after which to include monthly usage data. If not specified, the account creation
-        date is used.
-        :param end_date: The date up to which to include monthly usage data. If not specified, the account final date
-        is used.
+        :param start_date: Include transactions that occur on or after this date. If None, defaults to
+            Account.creation_date.
+        :param end_date: Include transactions that occur on or before this date. If None, defaults to
+            Account.final_date.
         """
+        if not self.creation_date:
+            return []
+
         if start_date is None:
             start_date = self.creation_date
         if end_date is None:
             end_date = self.final_date
 
+        monthly_usage = self.get_monthly_usage(start_date, end_date)
+        transaction_details = [monthly_usage.to_json() for monthly_usage in monthly_usage]
+        transactions = self.get_transactions(start_date, end_date)
+        transaction_details.extend([transaction.to_json() for transaction in transactions])
+
+        transaction_details = self.calculate_running_total(transaction_details)
+
+        return transaction_details
+
+    @staticmethod
+    def calculate_running_total(transaction_details: list[dict]) -> list[dict]:
+        # sort transactions by date and add running total
+        transaction_details = sorted(transaction_details, key=lambda d: d['date'])
+        running_total = 0
+        for row in transaction_details:
+            running_total += row["gross_total_pound"]
+            row["running_total"] = running_total
+        return transaction_details
+
+    def get_transactions(self, start_date: datetime.date, end_date: datetime.date) -> Iterable["Transaction"]:
+        """Returns a list of Transactions between the account creation date and the account
+        closure date"""
+        # Join to RechargeRequest provides information given in Transaction.to_json method.
+        transactions: Iterable[Transaction] = (
+            Transaction.select()
+            .join(RechargeRequest, JOIN.LEFT_OUTER)
+            .where((Transaction.account == self.id) & (Transaction.date >= start_date) & (Transaction.date <= end_date))
+        )
+        return transactions
+
+    def get_monthly_usage(self, start_date: datetime.date, end_date: datetime.date) -> Iterable["MonthlyUsage"]:
+        """Returns a list of dicts describing MonthlyUsage between `start_date` and `end_date`.
+
+        :param start_date: The date after which to include monthly usage data.
+        :param end_date: The date up to which to include monthly usage data.
+        """
         required_months = aam.utilities.get_months_between(start_date, end_date)
         self.check_missing_monthly_transactions(required_months)
 
-        # MonthlyUsage.to_json uses Month and RechargeRequest.reference
+        # Join to Month and RechargeRequest is used by MonthlyUsage.to_json method
         usage: Iterable[MonthlyUsage] = (
             MonthlyUsage.select(MonthlyUsage, Month, RechargeRequest.reference)
             .join_from(MonthlyUsage, RechargeRequest, JOIN.LEFT_OUTER)
@@ -136,7 +185,9 @@ class Account(BaseModel):
 
     def get_balance(self, date: datetime.date):
         """Get the balance of an account on a certain date. Includes transactions that fall on the given date."""
-    pass
+        transaction_details = self.get_transaction_details(end_date=date)
+        return transaction_details[-1]["running_total"]
+
 
 class Sysadmin(BaseModel):
     id = peewee.AutoField()
@@ -147,52 +198,11 @@ class Sysadmin(BaseModel):
     def full_name(self) -> str:
         return f"{self.person.first_name} {self.person.last_name}"
 
-class LastAccountUpdate(BaseModel):
-    id = peewee.IntegerField(primary_key=True)
-    organization = peewee.ForeignKeyField(Organization, backref="last_updated_time")
-    time = peewee.DateTimeField(null=True)
-
 class Note(BaseModel):
     id = peewee.AutoField()
     date = peewee.DateField()
     text = peewee.CharField()
     account = peewee.ForeignKeyField(Account, backref="notes")
-
-class Month(BaseModel):
-    month_code: int = peewee.IntegerField(primary_key=True)
-    exchange_rate: Decimal = peewee.DecimalField()
-    shared_charges: Iterable["SharedCharge"]  # backref
-
-    @property
-    def year(self) -> int:
-        return aam.utilities.year_from_month_code(self.month_code)
-
-    @property
-    def month(self) -> int:
-        """Months start at 1, e.g. Jan = 1, Feb = 2"""
-        return aam.utilities.month_from_month_code(self.month_code)
-
-    def __repr__(self):
-        return f"Month: {calendar.month_abbr[self.month]}-{self.year}"
-
-    def __str__(self):
-        return f"{calendar.month_abbr[self.month]}-{self.year}"
-
-    def to_date(self):
-        return datetime.date(self.year, self.month, 1)
-
-
-class RechargeRequest(BaseModel):
-    id = peewee.AutoField()
-    date: datetime.date = peewee.DateField()
-    reference = peewee.CharField()
-    status = peewee.CharField()
-    transactions: Iterable["Transaction"]  # backref
-    monthly_usage: Iterable["MonthlyUsage"]  # backref
-
-    def to_json(self):
-        return {"id": self.id, "date": self.date, "reference": self.reference, "status": self.status}
-
 
 class MonthlyUsage(BaseModel):
     # Usage is always in dollars
@@ -270,7 +280,6 @@ class Transaction(BaseModel):
     account = peewee.ForeignKeyField(Account, backref="transactions")
     _type: int = peewee.IntegerField()
     date: datetime.date = peewee.DateField()
-    nominal_date: datetime.date = peewee.DateField(null=True)  # Where the transaction appears in the journal
     amount: Decimal = peewee.DecimalField(null=True)  # The net value of the transaction
     is_pound = peewee.BooleanField()
     exchange_rate: Decimal = peewee.DecimalField(null=True)   # USD/GBP
@@ -295,12 +304,8 @@ class Transaction(BaseModel):
             raise TypeError(f"Error setting Transaction type: Unknown transaction type: '{value}'")
 
     def to_json(self) -> dict:
-        transaction = {"id": self.id, "account_id": self.account.id, "type": self.type, "note": self.note,
+        transaction = {"id": self.id, "date": self.date, "account_id": self.account.id, "type": self.type, "note": self.note,
                        "reference": self.reference, "project_code": self.project_code, "task_code": self.task_code}
-        if self.nominal_date:
-            transaction["date"] = self.nominal_date
-        else:
-            transaction["date"] = self.date
         if self.is_pound:
             # Accounts are settled in pounds so there is no reason to convert a pound transaction to a dollar value
             transaction.update({"currency": "£", "gross_total_pound": self.gross_total_pound})
@@ -353,7 +358,6 @@ class Transaction(BaseModel):
             return None
         else:
             return  self.gross_total_dollar * self.exchange_rate
-
 
 class SharedCharge(BaseModel):
     # Shared charges are a way to assign additional usage to a MonthlyUsage.

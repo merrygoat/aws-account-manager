@@ -3,10 +3,10 @@ from typing import TYPE_CHECKING, Iterable
 
 import nicegui.events
 from nicegui import ui
-from peewee import JOIN
+from peewee import JOIN, fn
 
 import aam.utilities
-from aam.models import Account, Person, Sysadmin, Organization
+from aam.models import Account, Person, Sysadmin, Organization, Transaction
 from aam.ui.notes import UIAccountNotes
 
 if TYPE_CHECKING:
@@ -64,12 +64,14 @@ class UIAccountDetails:
                 self.account_grid = ui.aggrid({
                     'defaultColDef': {"suppressMovable": True},
                     'columnDefs': [{"headerName": "id", "field": "id"},
-                                   {"headerName": "Organization", "field": "organization", "sort": "asc", "sortIndex": 0},
+                                   {"headerName": "Organization", "field": "organization", "sort": "asc", "sortIndex": 0, "filter": True},
                                    {"headerName": "Name", "field": "name", "sort": "asc", "sortIndex": 1},
-                                   {"headerName": "Status", "field": "status"},
+                                   {"headerName": "Status", "field": "status", "filter": True},
                                    {"headerName": "Date Opened", "field": "opened_date"},
                                    {"headerName": "Date Closed", "field": "closure_date"},
-                                   {"headerName": "Is recharged", "field": "is_recharged"},
+                                   {"headerName": "Is recharged", "field": "is_recharged", "filter": True},
+                                   {"headerName": "Last recharge", "field": "last_recharge"},
+                                   {"headerName": "Balance", "field": "balance"},
                                    {"headerName": "Budget Holder", "field": "budget_holder"},
                                    {"headerName": "Finance Code", "field": "finance_code"},
                                    {"headerName": "Task Code", "field": "task_code"}],
@@ -84,22 +86,30 @@ class UIAccountDetails:
         self.clear_account_details()
 
     def populate_account_list(self):
-        org_id = self.parent.get_selected_organization_id()
-
         account_details = []
 
-        if org_id:
-            accounts: Iterable[Account] = (Account.select(Account, Organization.name, Person.first_name, Person.last_name)
-                                           .join_from(Account, Person, JOIN.LEFT_OUTER)
-                                           .join_from(Account, Organization))
-            for account in accounts:
-                details = ({"id": account.id, "name": account.name, "organization": account.organization.name,
-                            "status": account.status, "opened_date": account.creation_date,
-                            "closure_date": account.closure_date, "finance_code": account.finance_code,
-                            "task_code": account.task_code, "is_recharged": account.is_recharged})
-                if account.budget_holder:
-                    details["budget_holder"] = f"{account.budget_holder.first_name} {account.budget_holder.last_name}"
-                account_details.append(details)
+        accounts: Iterable[Account] = (Account.select(Account, Organization.name, Person.first_name, Person.last_name, )
+                                       .join_from(Account, Person, JOIN.LEFT_OUTER)
+                                       .join_from(Account, Organization)
+                                       )
+        # I can't work out how to get this into a single SQL transaction so there have to be two that are matched up
+        last_recharge_date = (Account.select(Account.id, fn.MAX(Transaction.date))
+                              .join(Transaction, JOIN.LEFT_OUTER)
+                              .where(Transaction._type == 3)
+                              .group_by(Account.id)
+                              ).dicts()
+        last_recharge_date = {row['id']: row['date'] for row in last_recharge_date}
+
+        for account in accounts:
+            details = ({"id": account.id, "name": account.name, "organization": account.organization.name,
+                        "status": account.status, "opened_date": account.creation_date,
+                        "closure_date": account.closure_date, "finance_code": account.finance_code,
+                        "task_code": account.task_code, "is_recharged": account.is_recharged})
+            if account.budget_holder:
+                details["budget_holder"] = f"{account.budget_holder.first_name} {account.budget_holder.last_name}"
+            if account.id in last_recharge_date:
+                details["last_recharge"] = last_recharge_date[account.id]
+            account_details.append(details)
 
         self.account_grid.options["rowData"] = account_details
         self.account_grid.update()

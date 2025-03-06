@@ -98,15 +98,8 @@ class UITransactions:
         if account_id is None:
             row_data = []
         else:
-            account = Account.get(Account.id == account_id)
+            account: Account = Account.get(Account.id == account_id)
             row_data = account.get_transaction_details()
-
-        # sort transactions by date and add running total
-        row_data = sorted(row_data, key=lambda d: d['date'])
-        running_total = 0
-        for index, row in enumerate(row_data):
-            running_total += row["gross_total_pound"]
-            row["running_total"] = running_total
 
         self.transaction_grid.options["rowData"] = row_data
         self.transaction_grid.update()
@@ -126,7 +119,7 @@ class UITransactions:
             transaction: Transaction = Transaction.get(id=transaction_id)
 
         if cell_edited == "date":
-            transaction.nominal_date =  event.args["data"]["date"]
+            transaction.date = event.args["data"]["date"]
         elif cell_edited == "type":
             transaction.type = event.args["data"]["type"]
         elif cell_edited == "amount":
