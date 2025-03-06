@@ -139,7 +139,7 @@ class Account(BaseModel):
         closure date"""
         # Join to RechargeRequest provides information given in Transaction.to_json method.
         transactions: Iterable[Transaction] = (
-            Transaction.select()
+            Transaction.select(Transaction, RechargeRequest)
             .join(RechargeRequest, JOIN.LEFT_OUTER)
             .where((Transaction.account == self.id) & (Transaction.date >= start_date) & (Transaction.date <= end_date))
         )
@@ -266,6 +266,7 @@ class MonthlyUsage(BaseModel):
 class Transaction(BaseModel):
     id = peewee.AutoField()
     account = peewee.ForeignKeyField(Account, backref="transactions")
+    account_id: int  # Direct access to Foreign key value
     _type: int = peewee.IntegerField()
     date: datetime.date = peewee.DateField()
     amount: Decimal = peewee.DecimalField(null=True)  # The net value of the transaction
@@ -292,7 +293,7 @@ class Transaction(BaseModel):
             raise TypeError(f"Error setting Transaction type: Unknown transaction type: '{value}'")
 
     def to_json(self) -> dict:
-        transaction = {"id": self.id, "date": self.date, "account_id": self.account.id, "type": self.type, "note": self.note,
+        transaction = {"id": self.id, "date": self.date, "account_id": self.account_id, "type": self.type, "note": self.note,
                        "reference": self.reference, "project_code": self.project_code, "task_code": self.task_code}
         if self.is_pound:
             # Accounts are settled in pounds so there is no reason to convert a pound transaction to a dollar value
