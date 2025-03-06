@@ -9,6 +9,7 @@ import datetime
 import decimal
 from decimal import Decimal
 from collections.abc import Iterable
+from typing import TYPE_CHECKING
 
 import peewee
 from peewee import JOIN
@@ -60,18 +61,20 @@ class Account(BaseModel):
     notes: Iterable["Note"]  # backref
     transactions: Iterable["Transaction"]  # backref
 
-    def get_transactions(self) -> list[dict]:
+    def get_transaction_details(self) -> list[dict]:
         """Returns a list of dicts describing MonthlyUsage and Transactions in the account between the creation date
         and the account closure date. If the account creation date is not set then return an empty list."""
         if not self.creation_date:
             return []
 
-        transactions = self.get_monthly_usage_details()
-        transactions.extend(self.get_transaction_details())
-        return transactions
+        monthly_usage = self.get_monthly_usage()
+        transaction_details = [monthly_usage.to_json() for monthly_usage in monthly_usage]
+        transactions = self.get_transactions()
+        transaction_details.extend([transaction.to_json() for transaction in transactions])
+        return transaction_details
 
-    def get_transaction_details(self) -> list[dict]:
-        """Returns a list of dicts describing Transactions between the account creation date and the account
+    def get_transactions(self) -> Iterable["Transaction"]:
+        """Returns a list of Transactions between the account creation date and the account
         closure date"""
         if not self.creation_date:
             return []
@@ -84,12 +87,22 @@ class Account(BaseModel):
             .join(RechargeRequest, JOIN.LEFT_OUTER)
             .where((Transaction.account == self.id) & (Transaction.date >= self.creation_date) & (Transaction.date <= end_date))
         )
-        return [transaction.to_json() for transaction in transactions]
+        return transactions
 
-    def get_monthly_usage_details(self) -> list[dict]:
-        """Returns a list of dicts describing MonthlyUsage between the account creation date and the account
-        closure date"""
-        required_months = aam.utilities.get_months_between(self.creation_date, self.final_date)
+    def get_monthly_usage(self, start_date: datetime.date = None, end_date: datetime.date = None) -> Iterable["MonthlyUsage"]:
+        """Returns a list of dicts describing MonthlyUsage between `start_date` and `end_date`.
+
+        :param start_date: The date after which to include monthly usage data. If not specified, the account creation
+        date is used.
+        :param end_date: The date up to which to include monthly usage data. If not specified, the account final date
+        is used.
+        """
+        if start_date is None:
+            start_date = self.creation_date
+        if end_date is None:
+            end_date = self.final_date
+
+        required_months = aam.utilities.get_months_between(start_date, end_date)
         self.check_missing_monthly_transactions(required_months)
 
         # MonthlyUsage.to_json uses Month and RechargeRequest.reference
@@ -99,7 +112,7 @@ class Account(BaseModel):
             .join_from(MonthlyUsage, Month)
             .where((MonthlyUsage.month_id.in_(required_months)) & (MonthlyUsage.account_id == self.id)))
 
-        return [monthly_usage.to_json() for monthly_usage in usage]
+        return usage
 
     def check_missing_monthly_transactions(self, required_months: list[int]):
         """Accounts should have a usage transaction for each month the account is open. This function checks if the
@@ -121,6 +134,9 @@ class Account(BaseModel):
         else:
             return datetime.date.today()
 
+    def get_balance(self, date: datetime.date):
+        """Get the balance of an account on a certain date. Includes transactions that fall on the given date."""
+    pass
 
 class Sysadmin(BaseModel):
     id = peewee.AutoField()

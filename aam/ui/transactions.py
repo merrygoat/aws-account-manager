@@ -99,7 +99,7 @@ class UITransactions:
             row_data = []
         else:
             account = Account.get(Account.id == account_id)
-            row_data = account.get_transactions()
+            row_data = account.get_transaction_details()
 
         # sort transactions by date and add running total
         row_data = sorted(row_data, key=lambda d: d['date'])
