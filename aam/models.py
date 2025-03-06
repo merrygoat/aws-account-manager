@@ -219,7 +219,7 @@ class MonthlyUsage(BaseModel):
     def to_json(self) -> dict:
         date = aam.utilities.date_from_month_code(self.month_id)
         details = {"id": self.id, "account_id": self.account_id, "type": self.type, "date": date, "amount": self.amount,
-                   "shared_charge": self.shared_charges, "support_charge": self.support_charge, "currency": "$",
+                   "shared_charge": self.shared_charge, "support_charge": self.support_charge, "currency": "$",
                    "gross_total_dollar": self.gross_total_dollar, "gross_total_pound": self.gross_total_pound,
                    "note": self.note}
         if self.recharge_request:
@@ -235,18 +235,6 @@ class MonthlyUsage(BaseModel):
         return aam.utilities.date_from_month_code(self.month_id)
 
     @property
-    def shared_charges(self) -> decimal.Decimal:
-        if self.account_id is None or self.month_id is None:
-            raise ValueError("Calculation of shared charges failed due to missing data.")
-        total = decimal.Decimal(0)
-        charges = (SharedCharge.select(SharedCharge.month_id, AccountJoinSharedCharge.amount)
-                   .where((AccountJoinSharedCharge.account == self.account_id) & (SharedCharge.month_id == self.month_id))
-                   .join(AccountJoinSharedCharge))
-        for charge in charges:
-            total += charge.accountjoinsharedcharge.amount
-        return total
-
-    @property
     def support_eligible(self) -> bool:
         """Accounts must pay 10% charge after 01/08/24 as this was when the OGVA started."""
         return self.month_id >= aam.utilities.month_code(2024, 8)
@@ -255,7 +243,7 @@ class MonthlyUsage(BaseModel):
     def support_charge(self) -> Decimal:
         """If the transaction needs to be charged for support, return the amount in dollars."""
         if self.support_eligible and self.amount:
-            return (self.amount + self.shared_charges) * Decimal(0.1)
+            return (self.amount + self.shared_charge) * Decimal(0.1)
         else:
             return Decimal(0)
 
@@ -263,7 +251,7 @@ class MonthlyUsage(BaseModel):
     def gross_total_dollar(self) -> Decimal:
         """Usage + shared charges + support + VAT."""
         if self.amount:
-            return (self.amount + self.shared_charges + self.support_charge) * Decimal(1.2)
+            return (self.amount + self.shared_charge + self.support_charge) * Decimal(1.2)
         else:
             return Decimal(0)
 
@@ -372,10 +360,7 @@ class AccountJoinSharedCharge(BaseModel):
     account = peewee.ForeignKeyField(Account, backref="shared_charges_join")
     account_id: int  # Direct access to Foreign Key
     shared_charge = peewee.ForeignKeyField(SharedCharge, backref="account_join", on_delete="CASCADE")
-    # The amount of the shared charge assigned to the account.
-    # Am I even allowed to put values in an association table? It feels a bit weird, but I think it works...
-    amount: decimal = peewee.DecimalField()
-    shared_charge_id: int  # Direct access to foreign key value
+    shared_charge_id: int # Direct access to Foreign Key
 
     class Meta:
         primary_key = peewee.CompositeKey('account', 'shared_charge')

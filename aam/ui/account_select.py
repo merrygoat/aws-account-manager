@@ -57,23 +57,31 @@ class UIAccountSelect:
 
     def organization_selected(self, event: nicegui.events.ValueChangeEventArguments):
         selected_org_id = event.sender.value
-        self.update_account_select_options()
-        self.parent.set_selected_organization_id(selected_org_id)
+        print(f"selected org_id is {selected_org_id}")
+        current_org_id = self.parent.get_selected_organization_id()
+        print(f"current org_id is {current_org_id}")
+        # Need to add this test as the callback fires multiple times per select.
+        if selected_org_id != current_org_id:
+            print("running diff method")
+            self.update_account_select_options()
+            self.parent.set_selected_organization_id(selected_org_id)
 
     def account_selected(self, event: nicegui.events.ValueChangeEventArguments):
         selected_account_id = event.sender.value
-        account = list((Account.select(Account, Person)
-                        .where(Account.id == selected_account_id)
-                        .join_from(Account, Person, JOIN.LEFT_OUTER)))
-        if account:
-            account = account[0]
-        else:
-            account = None
+        current_account_id = self.parent.get_selected_account_id()
+        if selected_account_id != current_account_id:
+            account = list((Account.select(Account, Person)
+                            .where(Account.id == selected_account_id)
+                            .join_from(Account, Person, JOIN.LEFT_OUTER)))
+            if account:
+                account = account[0]
+            else:
+                account = None
 
-        self.parent.account_details.update(account)
-        self.parent.set_selected_account_id(account)
-        self.parent.transactions.initialize(account)
-        self.parent.account_details.notes.update_note_grid()
+            self.parent.account_details.update(account)
+            self.parent.set_selected_account_id(account.id)
+            self.parent.transactions.initialize(account)
+            self.parent.account_details.notes.update_note_grid()
 
     async def update_account_info(self):
         selected_organization = self.organization_select.value

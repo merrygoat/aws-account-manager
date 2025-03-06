@@ -4,9 +4,10 @@ from typing import TYPE_CHECKING, Iterable
 
 import nicegui.events
 from nicegui import ui
+from peewee import JOIN, fn
 
 import aam.utilities
-from aam.models import SharedCharge, Account, Month, AccountJoinSharedCharge
+from aam.models import SharedCharge, Account, Month, AccountJoinSharedCharge, MonthlyUsage
 
 if TYPE_CHECKING:
     from aam.main import UIMainForm
@@ -66,12 +67,15 @@ class UISharedCharges:
             self.shared_charge_dialog.open(shared_charge, mode="duplicate")
 
     async def delete_selected(self, event: nicegui.events.ClickEventArguments):
+        """Delete the selected SharedCharge and recalculate the SharedCharge amounts """
         selected_row = await self.shared_charges_table.get_selected_row()
         if selected_row is None:
             ui.notify("No shared charge selected.")
         else:
-            shared_charge = SharedCharge.get(SharedCharge.id==selected_row["id"])
+            shared_charge: SharedCharge = SharedCharge.get(SharedCharge.id==selected_row["id"])
+            month_code = shared_charge.month_id
             shared_charge.delete_instance()
+            calculate_shared_charge_per_account(month_code)
             self.populate_shared_charges_table()
             ui.notify("Shared charge deleted.")
 
@@ -132,6 +136,7 @@ class UISharedChargeDialog:
                     ui.button("Cancel", on_click=self.dialog.close)
 
     def update_account_select(self):
+        """Populate the account select element with a list of ACTIVE accounts in the currently selected organization"""
         selected_org_id = self.parent.parent.get_selected_organization_id()
         if not selected_org_id:
             return 0
@@ -145,39 +150,35 @@ class UISharedChargeDialog:
         self.account_select.set_options(accounts)
 
     def save_shared_charge(self, event: nicegui.events.ClickEventArguments):
+        """Take the information from the dialog and use it to either update an existing SharedCharge if editing or
+        create a new SharedCharge if creating a new one."""
         if not self.validate_inputs():
             return 0
 
         month_code = aam.utilities.month_code(self.year.value, self.month.value)
         amount = decimal.Decimal(self.amount.value)
-        num_selected_accounts = len(self.account_select.value)
-        amount_per_account = amount / num_selected_accounts
+
+        affected_accounts: list[str] = []
 
         if not self.shared_charge_id:
             shared_charge = SharedCharge.create(name=self.name.value, amount=amount, month=month_code)
+            affected_accounts.extend(self.account_select.value)
         else:
 
             # Get existing SharedCharge
             shared_charge: SharedCharge = SharedCharge.get(SharedCharge.id == self.shared_charge_id)
             shared_charge.name = self.name.value
-            shared_charge.amount_pound = amount
+            shared_charge.amount = amount
             shared_charge.month_id = month_code
             shared_charge.save()
 
-            # Get the accounts to which the shared charge applies
-            accounts = (Account.select(Account.id).where(SharedCharge.id == self.shared_charge_id)
-                        .join(AccountJoinSharedCharge)
-                        .join(SharedCharge).dicts())
-            account_ids = [account["id"] for account in accounts]
-            # If there is any change in the accounts on the shared charge then redo the AccountJoinSharedCharges
-            if not set(self.account_select.value) == set(account_ids):
-                # Delete AccountJoinSharedCharges currently associated with the Shared Charge
-                (AccountJoinSharedCharge.delete()
-                 .where((AccountJoinSharedCharge.account.in_(account_ids)) & (AccountJoinSharedCharge.shared_charge == shared_charge.id))
-                 .execute())
+            # Delete AccountJoinSharedCharges currently associated with the Shared Charge
+            AccountJoinSharedCharge.delete().where(AccountJoinSharedCharge.shared_charge == shared_charge.id).execute()
 
         for account_id in self.account_select.value:
-            AccountJoinSharedCharge.create(account=account_id, shared_charge=shared_charge.id, amount=amount_per_account)
+            AccountJoinSharedCharge.create(account=account_id, shared_charge=shared_charge.id)
+
+        calculate_shared_charge_per_account(month_code)
 
         self.parent.populate_shared_charges_table()
         self.parent.parent.transactions.update_transaction_grid()
@@ -187,8 +188,9 @@ class UISharedChargeDialog:
             ui.notify("New shared charge added.")
         self.close()
 
+
     def validate_inputs(self) -> bool:
-        """Returns True if all inputs are valid, else returns False."""
+        """Validate the fields in the dialog. Returns True if all inputs are valid, else returns False."""
         if self.name == "":
             ui.notify("Name must be provided.")
             return False
@@ -226,3 +228,36 @@ class UISharedChargeDialog:
     def close(self):
         self.shared_charge_id = None
         self.dialog.close()
+
+def calculate_shared_charge_per_account(month_code: int):
+    """Calculate the total of all SharedCharges assigned to an Account in the month `month_code` and assign this
+    value to the Account.shared_charge field."""
+
+    # Get the accounts and the ids of shared charges in the current month
+    accounts: list[dict] = (
+        SharedCharge.select(SharedCharge.id, AccountJoinSharedCharge.account_id)
+        .join(AccountJoinSharedCharge, JOIN.LEFT_OUTER)
+        .where(SharedCharge.month_id == month_code).dicts()
+    )
+    # Group by account
+    grouped_accounts = {}
+    for account in accounts:
+        grouped_accounts.setdefault(account["account"], []).append(account["id"])
+    amount_per_account = (
+        SharedCharge.select(
+            (SharedCharge.amount / fn.COUNT(AccountJoinSharedCharge.shared_charge_id)).alias("amount_per_account"),
+            SharedCharge.id)
+        .join(AccountJoinSharedCharge, JOIN.LEFT_OUTER)
+        .where(SharedCharge.month_id == month_code)
+        .group_by(SharedCharge.id)
+        .dicts()
+    )
+    # Group by SharedCharge id
+    amount_per_account = {row["id"]: row["amount_per_account"] for row in amount_per_account}
+    for account_id in grouped_accounts:
+        total = 0
+        for shared_charge_id in grouped_accounts[account_id]:
+            total += amount_per_account[shared_charge_id]
+        monthly_usage: MonthlyUsage = MonthlyUsage.get((MonthlyUsage.account_id == account_id) & (MonthlyUsage.month_id == month_code))
+        monthly_usage.shared_charge = total
+        monthly_usage.save()
