@@ -57,12 +57,9 @@ class UIAccountSelect:
 
     def organization_selected(self, event: nicegui.events.ValueChangeEventArguments):
         selected_org_id = event.sender.value
-        print(f"selected org_id is {selected_org_id}")
         current_org_id = self.parent.get_selected_organization_id()
-        print(f"current org_id is {current_org_id}")
         # Need to add this test as the callback fires multiple times per select.
         if selected_org_id != current_org_id:
-            print("running diff method")
             self.update_account_select_options()
             self.parent.set_selected_organization_id(selected_org_id)
 

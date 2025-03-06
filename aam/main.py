@@ -19,15 +19,16 @@ logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.DEBUG)
 
 
-@ui.page('/')
 def main():
-    initialization.initialize()
-
-    UIMainForm()
     app.on_exception(lambda e: ui.notify(f"Exception: {e}"))
+    app.on_startup(initialization.initialize)
     favicon = load_icon()
     ui.run(favicon=favicon)
 
+
+@ui.page('/')
+def homepage():
+    UIMainForm()
 
 class UIMainForm:
     def __init__(self):
@@ -77,7 +78,6 @@ class UIMainForm:
         self._selected_organization_id = org_id
         self.shared_charges.populate_shared_charges_table()
         self.account_select.update_last_updated_label(org_id)
-        self.account_details.populate_account_list()
 
     def get_selected_organization_id(self) -> Optional[str]:
         """Getter method for selected_account_id instance attribute."""
