@@ -67,16 +67,12 @@ class UIAccountSelect:
         selected_account_id = event.sender.value
         current_account_id = self.parent.get_selected_account_id()
         if selected_account_id != current_account_id:
-            account = list((Account.select(Account, Person)
-                            .where(Account.id == selected_account_id)
-                            .join_from(Account, Person, JOIN.LEFT_OUTER)))
-            if account:
-                account = account[0]
-            else:
-                account = None
+            account = (Account.select(Account, Person)
+                       .where(Account.id == selected_account_id)
+                       .join_from(Account, Person, JOIN.LEFT_OUTER)).get_or_none()
 
             self.parent.account_details.update(account)
-            self.parent.set_selected_account_id(account.id)
+            self.parent.set_selected_account_id(account)
             self.parent.transactions.initialize(account)
             self.parent.account_details.notes.update_note_grid()
 

@@ -3,6 +3,7 @@ from typing import Optional
 from nicegui import ui, app
 
 from aam import initialization
+from aam.models import Account
 from aam.ui.data_quality import UIDataQuality
 from aam.ui.transactions import UITransactions
 from aam.ui.import_data import UIImport
@@ -83,10 +84,10 @@ class UIMainForm:
         """Getter method for selected_account_id instance attribute."""
         return self._selected_organization_id
 
-    def set_selected_account_id(self, account_id: str | None):
+    def set_selected_account_id(self, account: Account | None):
         """Setter method for selected_account_id instance attribute."""
-        if account_id:
-            self._selected_account_id = account_id
+        if account:
+            self._selected_account_id = account.id
         else:
             self._selected_account_id = None
 
