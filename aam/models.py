@@ -112,7 +112,7 @@ class Account(BaseModel):
 
         if start_date is None:
             start_date = self.creation_date
-        if end_date is None:
+        if end_date is None or end_date > self.final_date:
             end_date = self.final_date
 
         monthly_usage = self.get_monthly_usage(start_date, end_date)
