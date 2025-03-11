@@ -38,7 +38,7 @@ class UITransactions:
                            {"headerName": "Gross Total ($)", "field": "gross_total_dollar",
                             "valueFormatter": 'value.toFixed(2)'},
                            {"headerName": "Gross Total (£)", "field": "gross_total_pound",
-                            "valueFormatter": 'value.toFixed(2)'},
+                            "valueFormatter": 'value.toFixed(2)', "editable": True},
                            {"headerName": "Running Total (£)", "field": "running_total",
                             "valueFormatter": 'value.toFixed(2)'},
                            {"headerName": "Reference", "field": "reference", "editable": True},
@@ -135,6 +135,13 @@ class UITransactions:
             transaction.reference = event.args["data"]["reference"]
         elif cell_edited == "note":
             transaction.note = event.args["data"]["note"]
+        elif cell_edited == "gross_total_pound":
+            if transaction.is_pound:
+                transaction.amount = event.args["data"]["gross_total_pound"]
+            else:
+                ui.notify("Unable to edit gross amount for dollar type transactions.")
+        else:
+            raise TypeError(f"No method to edit '{cell_edited}' column type.")
         transaction.save()
         self.update_transaction_grid()
         ui.notify(f"Transaction {cell_edited} updated.")
@@ -151,11 +158,11 @@ class UITransactions:
             return False
 
         # Fields that cannot be edited for MonthlyUsage
-        invalid_monthly_fields = ["date", "reference", "project_code", "task_code"]
+        invalid_monthly_fields = ["date", "reference", "project_code", "task_code", "gross_total_pound"]
         transaction_type = event.args["data"]["type"]
         cell_edited = event.args["colId"]
 
-
+        # Check whether it is valid to edit the field depending on transaction type
         invalid_change = False
         if cell_edited == "type" and event.args["oldValue"] == "Monthly":
             invalid_change = True
@@ -167,7 +174,8 @@ class UITransactions:
             self.transaction_grid.run_row_method(event.args['rowId'], 'setDataValue', cell_edited, event.args["oldValue"])
             return False
 
-        if cell_edited == "amount" and event.args["newValue"] is not None:
+        # Check whether numeric amount is parseable
+        if cell_edited in ["amount", "gross_total_pound"] and event.args["newValue"] is not None:
             try:
                 decimal.Decimal(event.args["newValue"])
             except decimal.InvalidOperation:
