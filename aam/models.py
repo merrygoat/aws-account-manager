@@ -183,8 +183,15 @@ class Account(BaseModel):
         else:
             return datetime.date.today()
 
-    def get_balance(self, date: datetime.date):
-        """Get the balance of an account on a certain date. Includes transactions that fall on the given date."""
+    def get_balance(self, date: datetime.date, inclusive: bool = True):
+        """Get the balance of an account on a certain date.
+
+        :param date: The date on which to calculate the balance.
+        :param inclusive: Whether the balance includes or excludes transactions that fall on `date`.
+        """
+        if not inclusive:
+            date = date - datetime.timedelta(days=1)
+
         transaction_details = self.get_transaction_details(end_date=date)
         return transaction_details[-1]["running_total"]
 
@@ -292,9 +299,22 @@ class Transaction(BaseModel):
         else:
             raise TypeError(f"Error setting Transaction type: Unknown transaction type: '{value}'")
 
+    @property
+    def support_eligible(self) -> bool:
+        """Accounts must pay 10% charge after 01/08/24 as this was when the OGVA started."""
+        return self.date >= datetime.date(2024, 8, 1)
+
+    @property
+    def support_charge(self) -> Decimal:
+        if self.type == "Savings Plan" and self.support_eligible:
+            return self.amount * Decimal(0.1)
+        else:
+            return Decimal(0)
+
     def to_json(self) -> dict:
-        transaction = {"id": self.id, "date": self.date, "account_id": self.account_id, "type": self.type, "note": self.note,
-                       "reference": self.reference, "project_code": self.project_code, "task_code": self.task_code}
+        transaction = {"id": self.id, "date": self.date, "account_id": self.account_id, "type": self.type,
+                       "support_charge": self.support_charge, "note": self.note, "reference": self.reference,
+                       "project_code": self.project_code, "task_code": self.task_code}
         if self.is_pound:
             # Accounts are settled in pounds so there is no reason to convert a pound transaction to a dollar value
             transaction.update({"currency": "£", "gross_total_pound": self.gross_total_pound})
@@ -311,6 +331,7 @@ class Transaction(BaseModel):
 
     @property
     def amount_pound(self) -> decimal.Decimal | None:
+        """Return the net value of the transaction in pounds."""
         if not self.amount:
             return None
         if self.is_pound:
@@ -320,6 +341,7 @@ class Transaction(BaseModel):
 
     @property
     def amount_dollar(self) -> decimal.Decimal | None:
+        """Return the net value of the transaction in dollars."""
         if not self.amount:
             return None
         if not self.is_pound:
@@ -336,7 +358,7 @@ class Transaction(BaseModel):
         if self.amount is None or self.amount_dollar is None:
             return None
         else:
-            return self.amount_dollar * Decimal(1.2)
+            return (self.amount_dollar + self.support_charge) * Decimal(1.2)
 
     @property
     def gross_total_pound(self) -> Decimal | None:

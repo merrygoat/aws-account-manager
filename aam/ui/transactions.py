@@ -268,7 +268,7 @@ class UIRechargeRequests:
         self.request_grid.options["rowData"] = request_details
         self.request_grid.update()
 
-    async def delete_selected_request(self, event: nicegui.events.ClickEventArguments):
+    async def delete_selected_request(self, _event: nicegui.events.ClickEventArguments):
         selected_row = await(self.request_grid.get_selected_row())
         if selected_row is None:
             ui.notify("No recharge request selected to delete.")
@@ -359,7 +359,7 @@ class UIRechargeRequests:
         self.request_summary_grid.options["rowData"] = list(account_totals.values())
         self.request_summary_grid.update()
 
-    async def add_transaction_to_request(self, event: nicegui.events.ClickEventArguments):
+    async def add_transaction_to_request(self, _event: nicegui.events.ClickEventArguments):
         """Get selected Transactions and MonthlyUsage and add them to the recharge request."""
         selected_request_row = await(self.parent.ui_recharge_requests.request_grid.get_selected_row())
         if not selected_request_row:
@@ -496,6 +496,8 @@ class UINewSingleTransactionDialog:
 
 
 class UINewRechargeDialog:
+    """Dialog box with options allowing the user to create a new RechargeRequest."""
+
     def __init__(self, parent: UIRechargeRequests):
         self.parent = parent
         with ui.dialog() as self.dialog:
@@ -534,7 +536,8 @@ class UINewRechargeDialog:
     def close(self):
         self.dialog.close()
 
-    def new_recharge_request(self, event: nicegui.events.ClickEventArguments):
+    def new_recharge_request(self, _event: nicegui.events.ClickEventArguments):
+        """Get the information the user has input to the Dialog and use it to create a new RechargeRequest."""
         start_month_code = None
         end_month_code = None
         if self.auto_populate.value is True:
