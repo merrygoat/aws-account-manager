@@ -1,3 +1,4 @@
+import calendar
 import datetime
 import decimal
 from decimal import Decimal
@@ -90,7 +91,7 @@ class UITransactions:
             self.update_transaction_grid()
             selected_request_row = await(self.ui_recharge_requests.request_grid.get_selected_row())
             if selected_request_row:
-                self.ui_recharge_requests.update_request_items_grid(selected_request_row["id"])
+                self.ui_recharge_requests.populate_request_items_grid(selected_request_row["id"])
             ui.notify("Transaction deleted.")
 
     def update_transaction_grid(self):
@@ -198,7 +199,8 @@ class UIRechargeRequests:
             ui.label("Recharge Requests").classes("text-4xl")
             self.request_grid = ui.aggrid({
                 'columnDefs': [{"headerName": "request_id", "field": "id", "hide": True},
-                               {"headerName": "Date", "field": "date", "sort": "asc", "sortIndex": 0},
+                               {"headerName": "Start Date", "field": "start_date", "sort": "asc", "sortIndex": 0},
+                               {"headerName": "End Date", "field": "end_date", "sort": "asc", "sortIndex": 0},
                                {"headerName": "Reference", "field": "reference", "editable": True},
                                {"headerName": "Status", "field": "status", 'editable': True,
                                 'cellEditor': 'agSelectCellEditor',
@@ -214,35 +216,26 @@ class UIRechargeRequests:
         with ui.column().classes("w-1/2"):
             ui.label("Request items").classes("text-4xl")
             self.request_items_grid = ui.aggrid({
-                'columnDefs': [{"headerName": "transaction_id", "field": "transaction_id", "hide": True},
+                'columnDefs': [{"headerName": "account_id", "field": "account_id", "hide": True},
+                               {"headerName": "transaction_ids", "field": "transaction_ids", "hide": True},
                                {"headerName": "Account", "field": "account_name", "sort": "asc", "sortIndex": 0},
-                               {"headerName": "Account ID", "field": "account_id"},
-                               {"headerName": "Date", "field": "date", "sort": "asc", "sortIndex": 1},
-                               {"headerName": "Type", "field": "type"},
-                               {"headerName": "Amount (£)", "field": "recharge_amount",
-                                "valueFormatter": "value.toFixed(2)"}],
+                               {"headerName": "Num Transactions", "field": "num_transactions"},
+                               {"headerName": "Start balance", "field": "start_balance",
+                                "valueFormatter": 'value.toFixed(2)'},
+                               {"headerName": "Transaction Total", "field": "transaction_total",
+                                "valueFormatter": 'value.toFixed(2)'},
+                               {"headerName": "Final balance", "field": "final_balance",
+                                "valueFormatter": 'value.toFixed(2)'},
+                               ],
                 'rowData': {},
                 'rowSelection': 'multiple',
                 'stopEditingWhenCellsLoseFocus': True,
-            })
-            with ui.row():
-                self.add_to_recharge_request_button = ui.button("Add selected transactions to request", on_click=self.add_transaction_to_request)
-                self.remove_recharge_button = ui.button("Remove selected transactions from request", on_click=self.remove_transaction_from_request)
-
-        with ui.column().classes("w-1/4"):
-            ui.label("Request summary").classes("text-4xl")
-            self.request_summary_grid = ui.aggrid({
-                'columnDefs': [{"headerName": "Account ID", "field": "account_id", "hide": True},
-                               {"headerName": "Account", "field": "account_name", "sort": "asc", "sortIndex": 0},
-                               {"headerName": "Amount (£)", "field": "recharge_amount", "valueFormatter": "value.toFixed(2)"}],
-                'rowData': {}
             })
 
         self.request_grid.on('rowSelected', self.request_row_selected)
         self.request_grid.on('cellValueChanged', self.request_edited)
         self.populate_request_grid()
         self.request_items_grid.on("cellDoubleClicked", self.cell_clicked)
-        self.request_summary_grid.on("cellDoubleClicked", self.cell_clicked)
 
     async def get_selected_recharge_id(self) -> Optional[str]:
         selected_row = await(self.request_grid.get_selected_row())
@@ -252,7 +245,7 @@ class UIRechargeRequests:
 
     def request_row_selected(self, event: nicegui.events.GenericEventArguments):
         if event.args["selected"] is True:
-            self.update_request_items_grid(event.args["data"]["id"])
+            self.populate_request_items_grid(event.args["data"]["id"])
 
     @staticmethod
     def request_edited(event: nicegui.events.GenericEventArguments):
@@ -274,15 +267,24 @@ class UIRechargeRequests:
             ui.notify("No recharge request selected to delete.")
             return 0
         request: RechargeRequest = RechargeRequest.get(selected_row["id"])
-        if request.transactions or request.monthly_usage:
-            ui.notify("Recharge request has recharges. These must be removed before deleting the request.")
-            return 0
-        else:
-            ui.notify(f"Request {request.reference} deleted.")
-            request.delete_instance()
-            self.populate_request_grid()
+
+        transactions = Transaction.select().where(Transaction.recharge_request == request)
+        for transaction in transactions:
+            transaction.recharge_request = None
+            transaction.save()
+
+        usage: Iterable[MonthlyUsage] = MonthlyUsage.select().where(MonthlyUsage.recharge_request == request)
+        for month in usage:
+            month.recharge_request = None
+            month.save()
+
+        request.delete_instance()
+        ui.notify(f"Request {request.reference} deleted.")
+        self.populate_request_grid()
+        self.populate_request_items_grid(None)
 
     async def export_recharge_request(self):
+        """Export data for the accounts that are to be recharged."""
         selected_row = await(self.request_grid.get_selected_row())
         if selected_row is None:
             ui.notify("No recharge request selected to export.")
@@ -327,107 +329,39 @@ class UIRechargeRequests:
         self.parent.parent.change_selected_organization(account.organization_id)
         self.parent.parent.change_selected_account(account.id)
 
-    def update_request_items_grid(self, request_id: int | None):
+    def populate_request_items_grid(self, request_id: int | None):
         if request_id is None:
-            return 0
+            accounts = []
+        else:
+            transactions: Iterable[Transaction] = (Transaction.select(Transaction, Account)
+                                                   .join(Account)
+                                                   .where(Transaction.recharge_request == request_id))
+            monthly_usage: Iterable[MonthlyUsage] = (MonthlyUsage.select(MonthlyUsage, Account)
+                                             .join(Account)
+                                             .where(MonthlyUsage.recharge_request == request_id))
 
-        transactions: Iterable[Transaction] = (Transaction.select(Transaction, Account)
-                                               .join(Account)
-                                               .where(Transaction.recharge_request == request_id))
-        monthly_usage: Iterable[MonthlyUsage] = (MonthlyUsage.select(MonthlyUsage, Account)
-                                         .join(Account)
-                                         .where(MonthlyUsage.recharge_request == request_id))
+            # For the properties exposed in the grid we can treat Transactions and MonthlyUsage as the same type of object.
+            items = list(transactions)
+            items.extend(list(monthly_usage))
 
-        # For the properties exposed in the grid we can treat Transactions and MonthlyUsage as the same type of object.
-        items = list(transactions)
-        items.extend(list(monthly_usage))
+            accounts = {}
 
-        recharges_list = []
-        account_totals = {}
+            for item in items:
+                account_id = item.account.id
+                if account_id not in accounts:
+                    accounts[account_id] = {"account_name": item.account.name, "account_id": account_id, "transaction_total": 0, "num_transactions": 0}
+                accounts[account_id]["transaction_total"] += item.gross_total_pound
+                accounts[account_id]["num_transactions"] += 1
 
-        for item in items:
-            recharges_list.append({"transaction_id": item.id, "account_name": item.account.name,
-                                   "account_id": item.account.id, "date": item.date, "type": item.type,
-                                   "recharge_amount": item.gross_total_pound})
-            if item.account.id not in account_totals:
-                account_totals[item.account.id] = {"account_name": item.account.name, "account_id": item.account.id,
-                                                   "recharge_amount": 0}
-            account_totals[item.account.id]["recharge_amount"] += item.gross_total_pound
+            for account_id in accounts:
+                accounts[account_id]["start_balance"] = 0
+                accounts[account_id]["final_balance"] = 0
 
-        self.request_items_grid.options["rowData"] = recharges_list
+            # Unpack dict to list to display in grid
+            accounts = [value for value in accounts.values()]
+
+        self.request_items_grid.options["rowData"] = accounts
         self.request_items_grid.update()
-        self.request_summary_grid.options["rowData"] = list(account_totals.values())
-        self.request_summary_grid.update()
-
-    async def add_transaction_to_request(self, _event: nicegui.events.ClickEventArguments):
-        """Get selected Transactions and MonthlyUsage and add them to the recharge request."""
-        selected_request_row = await(self.parent.ui_recharge_requests.request_grid.get_selected_row())
-        if not selected_request_row:
-            ui.notify("No recharge request selected")
-            return 0
-        selected_recharge_id = selected_request_row["id"]
-
-        selected_transaction_rows = await(self.parent.parent.transactions.get_selected_rows())
-        if not selected_transaction_rows:
-            ui.notify("No transactions selected")
-            return 0
-
-        monthly_ids = []
-        transaction_ids = []
-        for row in selected_transaction_rows:
-            if row["type"] == "Monthly":
-                monthly_ids.append(row["id"])
-            else:
-                transaction_ids.append(row["id"])
-
-        # Can combine MonthlyUsage and Transactions as they both have the required properties.
-        usage = list(MonthlyUsage.select().where(MonthlyUsage.id.in_(monthly_ids)))
-        transactions = list(Transaction.select().where(Transaction.id.in_(transaction_ids)))
-        transactions.extend(usage)
-
-        for transaction in transactions:
-            if transaction.amount is None:
-                ui.notify(f"Cannot add transaction for date {str(transaction.date)} as it has no recorded usage.")
-            else:
-                transaction.recharge_request = selected_recharge_id
-                transaction.save()
-
-        self.parent.update_transaction_grid()
-        self.update_request_items_grid(selected_recharge_id)
-
-    async def remove_transaction_from_request(self):
-        selected_rows = await(self.request_items_grid.get_selected_rows())
-
-        if selected_rows is None:
-            ui.notify("No transactions selected to remove.")
-            return 0
-
-        selected_usage = []
-        selected_transactions = []
-        for row in selected_rows:
-            if row["type"] == "Monthly":
-                selected_usage.append(row["transaction_id"])
-            else:
-                selected_transactions.append(row["transaction_id"])
-
-        if selected_usage:
-            usage = MonthlyUsage.select().where(MonthlyUsage.id.in_(selected_usage))
-            for month in usage:
-                month.recharge_request = None
-                month.save()
-
-        if selected_transactions:
-            transactions = Transaction.select().where(Transaction.id.in_(selected_transactions))
-            for transaction in transactions:
-                transaction.recharge_request = None
-                transaction.save()
-
-        selected_request_row = await(self.parent.ui_recharge_requests.request_grid.get_selected_row())
-        selected_request_id = selected_request_row["id"]
-
-        self.update_request_items_grid(selected_request_id)
-        self.parent.update_transaction_grid()
-
 
 class UINewSingleTransactionDialog:
     def __init__(self, parent: UITransactions):
@@ -508,8 +442,6 @@ class UINewRechargeDialog:
                     self.date_input = utilities.date_picker(datetime.date.today())
                     ui.label("Reference")
                     self.reference_input = ui.input(validation={"Must provide reference": lambda value: len(value) > 1})
-                    ui.label("Auto populate recharges")
-                    self.auto_populate = ui.switch(value=False)
                     with ui.row():
                         ui.label("Start month")
                         self.start_month = utilities.month_select()
@@ -525,11 +457,6 @@ class UINewRechargeDialog:
                     ui.button("Add", on_click=self.new_recharge_request)
                     ui.button("Cancel", on_click=self.dialog.close)
 
-        self.start_month.bind_enabled_from(self.auto_populate, "value")
-        self.start_year.bind_enabled_from(self.auto_populate, "value")
-        self.end_month.bind_enabled_from(self.auto_populate, "value")
-        self.end_year.bind_enabled_from(self.auto_populate, "value")
-
     def open(self):
         self.dialog.open()
 
@@ -538,38 +465,36 @@ class UINewRechargeDialog:
 
     def new_recharge_request(self, _event: nicegui.events.ClickEventArguments):
         """Get the information the user has input to the Dialog and use it to create a new RechargeRequest."""
-        start_month_code = None
-        end_month_code = None
-        if self.auto_populate.value is True:
-            start_month_code = aam.utilities.month_code(self.start_year.value, self.start_month.value)
-            end_month_code = aam.utilities.month_code(self.end_year.value, self.end_month.value)
-            if end_month_code < start_month_code:
-                ui.notify("End month must be after start month.")
-                return 0
+        start_date = datetime.date(self.start_year.value, self.start_month.value, 1)
+        last_day = calendar.monthrange(self.end_year.value, self.end_month.value)[1]
+        end_date = datetime.date(self.end_year.value, self.end_month.value, last_day)
+
+        if end_date < start_date:
+            ui.notify("End month must be after start month.")
+            return 0
 
         if self.reference_input.value != "":
-            recharge_request = RechargeRequest.create(date=datetime.date.fromisoformat(self.date_input.value),
+            recharge_request = RechargeRequest.create(start_date=start_date, end_date=end_date,
                                                       reference=self.reference_input.value, status="Draft")
         else:
             ui.notify("Must provide a reference")
             return 0
 
-        if self.auto_populate.value is True:
-            self.add_transactions_to_request(start_month_code, end_month_code, recharge_request)
+        self.add_transactions_to_request(start_date, end_date, recharge_request)
 
         ui.notify("New recharge request added")
         self.parent.parent.ui_recharge_requests.populate_request_grid()
         self.close()
 
     @staticmethod
-    def add_transactions_to_request(start_month_code: int, end_month_code: int, recharge_request: RechargeRequest):
-        """Find any Transaction or MonthlyUsage between the start of `start_month` and the end of `end_month` and
-        add them to the recharge request."""
-        start_date = aam.utilities.date_from_month_code(start_month_code)
-        end_date = aam.utilities.date_from_month_code(end_month_code + 1)
+    def add_transactions_to_request(start_date: datetime.date, end_date: datetime.date,
+                                    recharge_request: RechargeRequest):
+        """Find any Transaction or MonthlyUsage between `start_date` and the `end_date` and add them to the
+        recharge request."""
+
         transactions: Iterable[Transaction] = (Transaction.select(Transaction, Account)
                                                .join(Account)
-                                               .where((Account.is_recharged == True) & (Transaction.date > start_date) & (Transaction.date < end_date)))
+                                               .where((Account.is_recharged == True) & (Transaction.date >= start_date) & (Transaction.date < end_date)))
         for transaction in transactions:
             if not transaction.recharge_request:
                 transaction.recharge_request = recharge_request.id
@@ -580,8 +505,7 @@ class UINewRechargeDialog:
 
         usage = (MonthlyUsage.select(MonthlyUsage, Account)
                  .join(Account)
-                 .where(
-            (Account.is_recharged == True) & (MonthlyUsage.month_id >= start_month_code) & (MonthlyUsage.month_id <= end_month_code)))
+                 .where((Account.is_recharged == True) & (MonthlyUsage.date >= start_date) & (MonthlyUsage.date <= end_date)))
         for month_usage in usage:
             if not month_usage.recharge_request:
                 month_usage.recharge_request = recharge_request.id
