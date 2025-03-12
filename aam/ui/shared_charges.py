@@ -1,3 +1,4 @@
+import datetime
 import decimal
 import re
 from typing import TYPE_CHECKING, Iterable
@@ -73,9 +74,9 @@ class UISharedCharges:
             ui.notify("No shared charge selected.")
         else:
             shared_charge: SharedCharge = SharedCharge.get(SharedCharge.id==selected_row["id"])
-            month_code = shared_charge.month_id
+            date = shared_charge.date
             shared_charge.delete_instance()
-            calculate_shared_charge_per_account(month_code)
+            calculate_shared_charge_per_account(date)
             self.populate_shared_charges_table()
             ui.notify("Shared charge deleted.")
 
@@ -96,11 +97,11 @@ class UISharedCharges:
                 sorted_shared_charges.setdefault(charge.id, []).append(charge)
 
             for charge_id, charges in sorted_shared_charges.items():
-                month_date = aam.utilities.date_from_month_code(charges[0].month_id)
+                date = charges[0].date
                 account_names = [charge.accountjoinsharedcharge.account.name for charge in charges]
                 account_names = ", ".join(sorted(account_names))
-                charge_details.append({"id": charge_id, "name": charges[0].name, "amount": charges[0].amount, "month": month_date,
-                                       "account_names": account_names})
+                charge_details.append({"id": charge_id, "name": charges[0].name, "amount": charges[0].amount,
+                                       "month": date, "account_names": account_names})
 
         self.shared_charges_table.options["rowData"] = charge_details
         self.shared_charges_table.update()
@@ -155,13 +156,13 @@ class UISharedChargeDialog:
         if not self.validate_inputs():
             return 0
 
-        month_code = aam.utilities.month_code(self.year.value, self.month.value)
+        date = datetime.date(self.year.value, self.month.value, 1)
         amount = decimal.Decimal(self.amount.value)
 
         affected_accounts: list[str] = []
 
         if not self.shared_charge_id:
-            shared_charge = SharedCharge.create(name=self.name.value, amount=amount, month=month_code)
+            shared_charge = SharedCharge.create(name=self.name.value, amount=amount, date=date)
             affected_accounts.extend(self.account_select.value)
         else:
 
@@ -169,7 +170,7 @@ class UISharedChargeDialog:
             shared_charge: SharedCharge = SharedCharge.get(SharedCharge.id == self.shared_charge_id)
             shared_charge.name = self.name.value
             shared_charge.amount = amount
-            shared_charge.month_id = month_code
+            shared_charge.date = date
             shared_charge.save()
 
             # Delete AccountJoinSharedCharges currently associated with the Shared Charge
@@ -178,7 +179,7 @@ class UISharedChargeDialog:
         for account_id in self.account_select.value:
             AccountJoinSharedCharge.create(account=account_id, shared_charge=shared_charge.id)
 
-        calculate_shared_charge_per_account(month_code)
+        calculate_shared_charge_per_account(date)
 
         self.parent.populate_shared_charges_table()
         self.parent.parent.transactions.update_transaction_grid()
@@ -211,17 +212,16 @@ class UISharedChargeDialog:
 
         if mode != "new":
             # Get accounts associated with exising shared charge
-            month: Month = Month.get(Month.month_code == shared_charge.month)
             accounts = (Account.select(Account.id).where(SharedCharge.id == shared_charge.id)
                         .join(AccountJoinSharedCharge)
                         .join(SharedCharge).dicts())
             account_ids = [account["id"] for account in accounts]
 
-            self.name.value = shared_charge.name
-            self.month.value = month.month
-            self.year.value = month.year
-            self.amount.value = str(shared_charge.amount)
-            self.account_select.value = account_ids
+            self.name.set_value(shared_charge.name)
+            self.month.set_value(shared_charge.date.month)
+            self.year.set_value(shared_charge.date.year)
+            self.amount.set_value(str(shared_charge.amount))
+            self.account_select.set_value(account_ids)
 
         self.dialog.open()
 
@@ -229,15 +229,15 @@ class UISharedChargeDialog:
         self.shared_charge_id = None
         self.dialog.close()
 
-def calculate_shared_charge_per_account(month_code: int):
-    """Calculate the total of all SharedCharges assigned to an Account in the month `month_code` and assign this
+def calculate_shared_charge_per_account(date: datetime.date):
+    """Calculate the total of all SharedCharges assigned to an Account in the month given by `date` and assign this
     value to the Account.shared_charge field."""
 
     # Get the accounts and the ids of shared charges in the current month
     accounts: list[dict] = (
         SharedCharge.select(SharedCharge.id, AccountJoinSharedCharge.account_id)
         .join(AccountJoinSharedCharge, JOIN.LEFT_OUTER)
-        .where(SharedCharge.month_id == month_code).dicts()
+        .where(SharedCharge.date == date).dicts()
     )
     # Group by account
     grouped_accounts = {}
@@ -248,12 +248,13 @@ def calculate_shared_charge_per_account(month_code: int):
             (SharedCharge.amount / fn.COUNT(AccountJoinSharedCharge.shared_charge_id)).alias("amount_per_account"),
             SharedCharge.id)
         .join(AccountJoinSharedCharge, JOIN.LEFT_OUTER)
-        .where(SharedCharge.month_id == month_code)
+        .where(SharedCharge.date == date)
         .group_by(SharedCharge.id)
         .dicts()
     )
     # Group by SharedCharge id
     amount_per_account = {row["id"]: row["amount_per_account"] for row in amount_per_account}
+    month_code = aam.utilities.month_code(date.year, date.month)
     for account_id in grouped_accounts:
         total = 0
         for shared_charge_id in grouped_accounts[account_id]:

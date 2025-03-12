@@ -72,14 +72,16 @@ class Month(BaseModel):
 
 class RechargeRequest(BaseModel):
     id = peewee.AutoField()
-    date: datetime.date = peewee.DateField()
+    start_date: datetime.date = peewee.DateField()
+    end_date: datetime.date = peewee.DateField()
     reference = peewee.CharField()
     status = peewee.CharField()
     transactions: Iterable["Transaction"]  # backref
     monthly_usage: Iterable["MonthlyUsage"]  # backref
 
     def to_json(self):
-        return {"id": self.id, "date": self.date, "reference": self.reference, "status": self.status}
+        return {"id": self.id, "start_date": self.start_date, "end_date": self.end_date, "reference": self.reference,
+                "status": self.status}
 
 class Account(BaseModel):
     id = peewee.CharField(primary_key=True)
@@ -374,9 +376,8 @@ class SharedCharge(BaseModel):
     # Shared charges are a way to assign additional usage to a MonthlyUsage.
     id = peewee.AutoField()
     name = peewee.TextField()
+    date: datetime.date = peewee.DateField()
     amount: decimal.Decimal = peewee.DecimalField()
-    month: Month = peewee.ForeignKeyField(Month, backref="shared_charges")
-    month_id: int  # Direct access to the Foreign key value
 
 
 class AccountJoinSharedCharge(BaseModel):

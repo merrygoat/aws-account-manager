@@ -110,9 +110,9 @@ class UIDataQuality:
         self.no_close_grid.update()
 
     def populate_recharges_missing_code_grid(self):
-        transactions = (Transaction.select(Transaction, Account.name, Account.id)
-                        .join(Account)
-                        .where((Transaction._type == 3) & (Transaction.project_code.is_null())))
+        transactions: Iterable[Transaction] = (Transaction.select(Transaction, Account.name, Account.id)
+                                               .join(Account)
+                                               .where((Transaction._type == 3) & (Transaction.project_code.is_null())))
         transaction_details = [{"account_name": transaction.account.name, "account_id": transaction.account_id,
                                 "transaction_date": transaction.date} for transaction in transactions]
         self.recharges_missing_code_grid.options["rowData"] = transaction_details
