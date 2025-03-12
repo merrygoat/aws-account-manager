@@ -71,7 +71,7 @@ class UIAccountDetails:
                                    {"headerName": "Date Closed", "field": "closure_date"},
                                    {"headerName": "Is recharged", "field": "is_recharged", "filter": True},
                                    {"headerName": "Last recharge", "field": "last_recharge"},
-                                   {"headerName": "Balance", "field": "balance"},
+                                   {"headerName": "Balance (£)", "field": "balance", "valueFormatter": "value.toFixed(2)"},
                                    {"headerName": "Budget Holder", "field": "budget_holder"},
                                    {"headerName": "Finance Code", "field": "finance_code"},
                                    {"headerName": "Task Code", "field": "task_code"}],
@@ -104,7 +104,8 @@ class UIAccountDetails:
             details = ({"id": account.id, "name": account.name, "organization": account.organization.name,
                         "status": account.status, "opened_date": account.creation_date,
                         "closure_date": account.closure_date, "finance_code": account.finance_code,
-                        "task_code": account.task_code, "is_recharged": account.is_recharged})
+                        "task_code": account.task_code, "is_recharged": account.is_recharged,
+                        "balance": account.get_balance(datetime.date.today())})
             if account.budget_holder:
                 details["budget_holder"] = f"{account.budget_holder.first_name} {account.budget_holder.last_name}"
             if account.id in last_recharge_date:
