@@ -229,6 +229,7 @@ class UISharedChargeDialog:
         self.shared_charge_id = None
         self.dialog.close()
 
+
 def calculate_shared_charge_per_account(date: datetime.date):
     """Calculate the total of all SharedCharges assigned to an Account in the month given by `date` and assign this
     value to the Account.shared_charge field."""

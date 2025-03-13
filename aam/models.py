@@ -50,7 +50,6 @@ class LastAccountUpdate(BaseModel):
 class Month(BaseModel):
     month_code: int = peewee.IntegerField(primary_key=True)
     exchange_rate: Decimal = peewee.DecimalField()
-    shared_charges: Iterable["SharedCharge"]  # backref
 
     @property
     def year(self) -> int:
@@ -175,7 +174,8 @@ class Account(BaseModel):
         missing_months = set(required_months) - set(existing_transaction_months)
         if missing_months:
             for month_code in missing_months:
-                MonthlyUsage.create(account=self.id, month=month_code)
+                MonthlyUsage.create(account=self.id, month=month_code,
+                                    date=aam.utilities.date_from_month_code(month_code))
 
     @property
     def final_date(self) -> datetime.date:
@@ -217,6 +217,7 @@ class MonthlyUsage(BaseModel):
     # Usage is always in dollars
     id = peewee.AutoField()
     account = peewee.ForeignKeyField(Account, backref="monthly_usage")
+    date: datetime.date = peewee.DateField()
     account_id: int  # Direct access to foreign key value
     month: Month = peewee.ForeignKeyField(Month, backref="monthly_usage")
     month_id: int  # Direct access to foreign key value
@@ -226,8 +227,7 @@ class MonthlyUsage(BaseModel):
     note = peewee.CharField(null=True)
 
     def to_json(self) -> dict:
-        date = aam.utilities.date_from_month_code(self.month_id)
-        details = {"id": self.id, "account_id": self.account_id, "type": self.type, "date": date, "amount": self.amount,
+        details = {"id": self.id, "account_id": self.account_id, "type": self.type, "date": self.date, "amount": self.amount,
                    "shared_charge": self.shared_charge, "support_charge": self.support_charge, "currency": "$",
                    "gross_total_dollar": self.gross_total_dollar, "gross_total_pound": self.gross_total_pound,
                    "note": self.note}
@@ -240,13 +240,9 @@ class MonthlyUsage(BaseModel):
         return "Monthly"
 
     @property
-    def date(self) -> datetime.date:
-        return aam.utilities.date_from_month_code(self.month_id)
-
-    @property
     def support_eligible(self) -> bool:
         """Accounts must pay 10% charge after 01/08/24 as this was when the OGVA started."""
-        return self.month_id >= aam.utilities.month_code(2024, 8)
+        return self.date >= datetime.date(2024, 8, 1)
 
     @property
     def support_charge(self) -> Decimal:

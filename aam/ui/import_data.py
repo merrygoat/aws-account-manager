@@ -160,7 +160,8 @@ class UIImport:
                 usage.amount = decimal.Decimal(line[-1])
                 usage.save()
             else:
-                MonthlyUsage.create(account=line[0], month=month_code, amount=decimal.Decimal(line[-1]))
+                MonthlyUsage.create(account=line[0], month=month_code, amount=decimal.Decimal(line[-1]),
+                                    date=aam.utilities.date_from_month_code(month_code))
 
         self.parent.transactions.update_transaction_grid()
         ui.notify("Monthly Usage added to accounts.")
@@ -233,7 +234,8 @@ class UIImport:
                 usage = MonthlyUsage.get_or_none(account=account_number, month=month_code)
 
                 if not usage:
-                    MonthlyUsage.create(account=account_number, month=month_code, amount=amount)
+                    MonthlyUsage.create(account=account_number, month=month_code, amount=amount,
+                                        date=aam.utilities.date_from_month_code(month_code))
                 else:
                     usage.amount = amount
                     usage.save()
