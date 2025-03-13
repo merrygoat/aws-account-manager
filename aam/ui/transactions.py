@@ -122,7 +122,7 @@ class UITransactions:
         if cell_edited == "date":
             transaction.date = event.args["data"]["date"]
         elif cell_edited == "type":
-            transaction.type = event.args["data"]["type"]
+            transaction.type = TRANSACTION_TYPES.index(event.args["data"]["type"])
         elif cell_edited == "amount":
             amount = event.args["data"]["amount"]
             if amount is not None:

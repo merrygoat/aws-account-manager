@@ -6,7 +6,7 @@ from nicegui import ui
 from peewee import JOIN, fn
 
 import aam.utilities
-from aam.models import Account, Person, Sysadmin, Organization, Transaction
+from aam.models import Account, Person, Sysadmin, Organization, Transaction, TRANSACTION_TYPES
 from aam.ui.notes import UIAccountNotes
 
 if TYPE_CHECKING:
@@ -95,7 +95,7 @@ class UIAccountDetails:
         # I can't work out how to get this into a single SQL transaction so there have to be two that are matched up
         last_recharge_date = (Account.select(Account.id, fn.MAX(Transaction.date))
                               .join(Transaction, JOIN.LEFT_OUTER)
-                              .where(Transaction._type == 3)
+                              .where(Transaction.type == TRANSACTION_TYPES.index("Recharge"))
                               .group_by(Account.id)
                               ).dicts()
         last_recharge_date = {row['id']: row['date'] for row in last_recharge_date}

@@ -195,6 +195,8 @@ class Account(BaseModel):
             date = date - datetime.timedelta(days=1)
 
         transaction_details = self.get_transaction_details(end_date=date)
+        if len(transaction_details) == 0:
+            return 0
         return transaction_details[-1]["running_total"]
 
 
@@ -219,10 +221,10 @@ class MonthlyUsage(BaseModel):
     account = peewee.ForeignKeyField(Account, backref="monthly_usage")
     date: datetime.date = peewee.DateField()
     account_id: int  # Direct access to foreign key value
+    amount: Decimal = peewee.DecimalField(null=True)  # The net value of the usage
     month: Month = peewee.ForeignKeyField(Month, backref="monthly_usage")
     month_id: int  # Direct access to foreign key value
     shared_charge: Decimal = peewee.DecimalField(default=0)
-    amount: Decimal = peewee.DecimalField(null=True)  # The net value of the usage
     recharge_request = peewee.ForeignKeyField(RechargeRequest, backref="monthly_usage", null=True)
     note = peewee.CharField(null=True)
 
@@ -272,7 +274,7 @@ class Transaction(BaseModel):
     id = peewee.AutoField()
     account = peewee.ForeignKeyField(Account, backref="transactions")
     account_id: int  # Direct access to Foreign key value
-    _type: int = peewee.IntegerField()
+    type: int = peewee.IntegerField()
     date: datetime.date = peewee.DateField()
     amount: Decimal = peewee.DecimalField(null=True)  # The net value of the transaction
     is_pound = peewee.BooleanField()
@@ -284,33 +286,22 @@ class Transaction(BaseModel):
     task_code = peewee.CharField(null=True)
 
     @property
-    def type(self):
-        if self._type < len(TRANSACTION_TYPES):
-            return TRANSACTION_TYPES[self._type]
-        else:
-            raise TypeError(f"Error getting Transaction type: Unknown transaction type: '{self._type}'")
-
-    @type.setter
-    def type(self, value: str):
-        if value in TRANSACTION_TYPES:
-            self._type = TRANSACTION_TYPES.index(value)
-        else:
-            raise TypeError(f"Error setting Transaction type: Unknown transaction type: '{value}'")
-
-    @property
     def support_eligible(self) -> bool:
         """Accounts must pay 10% charge after 01/08/24 as this was when the OGVA started."""
         return self.date >= datetime.date(2024, 8, 1)
 
     @property
     def support_charge(self) -> Decimal:
-        if self.type == "Savings Plan" and self.support_eligible:
-            return self.amount * Decimal(0.1)
-        else:
-            return Decimal(0)
+        if self.support_eligible and self.amount:
+            if self.type == TRANSACTION_TYPES.index("Savings Plan"):
+                return self.amount * Decimal(0.1)
+            elif self.type == TRANSACTION_TYPES.index("Monthly"):
+                return (self.amount + self.shared_charge) * Decimal(0.1)
+        return Decimal(0)
 
     def to_json(self) -> dict:
-        transaction = {"id": self.id, "date": self.date, "account_id": self.account_id, "type": self.type,
+        transaction_type = TRANSACTION_TYPES[self.type]
+        transaction = {"id": self.id, "date": self.date, "account_id": self.account_id, "type": transaction_type,
                        "support_charge": self.support_charge, "note": self.note, "reference": self.reference,
                        "project_code": self.project_code, "task_code": self.task_code}
         if self.is_pound:
@@ -365,8 +356,9 @@ class Transaction(BaseModel):
             return self.amount
         if self.gross_total_dollar is None:
             return None
-        else:
-            return  self.gross_total_dollar * self.exchange_rate
+
+        return  self.gross_total_dollar * self.exchange_rate
+
 
 class SharedCharge(BaseModel):
     # Shared charges are a way to assign additional usage to a MonthlyUsage.

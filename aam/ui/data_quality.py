@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Iterable
 import nicegui.events
 from nicegui import ui
 
-from aam.models import Account, Organization, MonthlyUsage, Transaction
+from aam.models import Account, Organization, MonthlyUsage, Transaction, TRANSACTION_TYPES
 import aam.utilities
 
 if TYPE_CHECKING:
@@ -112,7 +112,7 @@ class UIDataQuality:
     def populate_recharges_missing_code_grid(self):
         transactions: Iterable[Transaction] = (Transaction.select(Transaction, Account.name, Account.id)
                                                .join(Account)
-                                               .where((Transaction._type == 3) & (Transaction.project_code.is_null())))
+                                               .where((Transaction.type == TRANSACTION_TYPES.index("Recharge")) & (Transaction.project_code.is_null())))
         transaction_details = [{"account_name": transaction.account.name, "account_id": transaction.account_id,
                                 "transaction_date": transaction.date} for transaction in transactions]
         self.recharges_missing_code_grid.options["rowData"] = transaction_details
