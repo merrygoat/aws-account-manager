@@ -224,7 +224,7 @@ class UIRechargeRequests:
                                 "valueFormatter": 'value.toFixed(2)'},
                                {"headerName": "Transaction Total", "field": "transaction_total",
                                 "valueFormatter": 'value.toFixed(2)'},
-                               {"headerName": "Final balance", "field": "final_balance",
+                               {"headerName": "End balance", "field": "end_balance",
                                 "valueFormatter": 'value.toFixed(2)'},
                                ],
                 'rowData': {},
@@ -290,6 +290,8 @@ class UIRechargeRequests:
             ui.notify("No recharge request selected to export.")
             return 0
 
+        recharge_data = self.request_items_grid.options["rowData"]
+
         request_id = selected_row["id"]
         transactions = (Transaction.select(Transaction, Account, Person)
                         .join(Account)
@@ -333,6 +335,8 @@ class UIRechargeRequests:
         if request_id is None:
             accounts = []
         else:
+            request = RechargeRequest.get(RechargeRequest.id == request_id)
+
             transactions: Iterable[Transaction] = (Transaction.select(Transaction, Account)
                                                    .join(Account)
                                                    .where(Transaction.recharge_request == request_id))
@@ -349,13 +353,15 @@ class UIRechargeRequests:
             for item in items:
                 account_id = item.account.id
                 if account_id not in accounts:
-                    accounts[account_id] = {"account_name": item.account.name, "account_id": account_id, "transaction_total": 0, "num_transactions": 0}
+                    start_balance = item.account.get_balance(request.start_date, inclusive=False)
+                    end_balance = item.account.get_balance(request.end_date, inclusive=False)
+                    accounts[account_id] = {"account_name": item.account.name, "account_id": account_id,
+                                            "transaction_total": 0, "num_transactions": 0,
+                                            "start_balance": start_balance, "end_balance": end_balance}
                 accounts[account_id]["transaction_total"] += item.gross_total_pound
+                accounts[account_id]["transaction_ids"] += item.id
                 accounts[account_id]["num_transactions"] += 1
 
-            for account_id in accounts:
-                accounts[account_id]["start_balance"] = 0
-                accounts[account_id]["final_balance"] = 0
 
             # Unpack dict to list to display in grid
             accounts = [value for value in accounts.values()]
