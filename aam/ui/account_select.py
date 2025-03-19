@@ -49,11 +49,13 @@ class UIAccountSelect:
         if self.show_suspended.value is True:
             valid_status.append("SUSPENDED")
 
-        account_query = Account.select().where(Account.organization == organization_id)
-        accounts = {None: "No account selected"}
-        accounts.update({account.id: f"{account.name} ({account.id}) - {account.status}"
-                         for account in account_query if account.status in valid_status})
-        self.account_select.set_options(accounts)
+        accounts = sorted(list(Account.select().where(Account.organization == organization_id)),
+                          key=lambda item: item.name)
+
+        account_items = {None: "No account selected"}
+        account_items.update({account.id: f"{account.name} ({account.id}) - {account.status}"
+                              for account in accounts if account.status in valid_status})
+        self.account_select.set_options(account_items)
 
     def organization_selected(self, event: nicegui.events.ValueChangeEventArguments):
         selected_org_id = event.sender.value

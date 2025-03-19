@@ -4,12 +4,14 @@ import decimal
 from decimal import Decimal
 from typing import TYPE_CHECKING, Iterable, Optional
 
+import jinja2
 import nicegui.events
 from nicegui import ui
+import requests
 
-import aam.utilities
 from aam import utilities
-from aam.models import Account, Person, RechargeRequest, Transaction, MonthlyUsage, TRANSACTION_TYPES
+from aam.config import CONFIG
+from aam.models import Account, RechargeRequest, Transaction, MonthlyUsage, TRANSACTION_TYPES, Note
 
 if TYPE_CHECKING:
     from aam.main import UIMainForm
@@ -73,13 +75,13 @@ class UITransactions:
 
         self.new_transaction_dialog.open(account_id)
 
-    async def delete_selected_transaction(self, event: nicegui.events.ClickEventArguments):
+    async def delete_selected_transaction(self, _event: nicegui.events.ClickEventArguments):
         selected_rows = await(self.get_selected_rows())
         if selected_rows is None:
             ui.notify("No recharge request selected")
 
         transaction_types = [row["type"] for row in selected_rows]
-        if "Monthly" in transaction_types:
+        if "Monthly Usage" in transaction_types:
             ui.notify("Monthly type transactions can not be deleted.")
             return 0
 
@@ -114,7 +116,7 @@ class UITransactions:
         transaction_type = event.args["data"]["type"]
         cell_edited = event.args["colId"]
 
-        if transaction_type == "Monthly":
+        if transaction_type == "Monthly Usage":
             transaction: MonthlyUsage = MonthlyUsage.get(id=transaction_id)
         else:
             transaction: Transaction = Transaction.get(id=transaction_id)
@@ -150,7 +152,7 @@ class UITransactions:
     def _validate_cell_change(self, event: nicegui.events.GenericEventArguments) -> bool:
         """Validate whether a change made to the Transaction gird is valid.
 
-        :param event: The data from the cellValueChanged aggrid event.
+        :param event: The data from the cellValueChanged AGGrid event.
 
         Returns True if change is valid else returns False
         """
@@ -165,13 +167,13 @@ class UITransactions:
 
         # Check whether it is valid to edit the field depending on transaction type
         invalid_change = False
-        if cell_edited == "type" and event.args["oldValue"] == "Monthly":
+        if cell_edited == "type" and event.args["oldValue"] == "Monthly Usage":
             invalid_change = True
-        if cell_edited in invalid_monthly_fields and transaction_type == "Monthly":
+        if cell_edited in invalid_monthly_fields and transaction_type == "Monthly Usage":
             invalid_change = True
 
         if invalid_change:
-            ui.notify(f'Can not change field "{cell_edited}" for "Monthly" type transactions.')
+            ui.notify(f'Can not change field "{cell_edited}" for "Monthly Usage" type transactions.')
             self.transaction_grid.run_row_method(event.args['rowId'], 'setDataValue', cell_edited, event.args["oldValue"])
             return False
 
@@ -212,8 +214,9 @@ class UIRechargeRequests:
             with ui.row():
                 self.add_request_button = ui.button("Add new request", on_click=self.new_request_dialog.open)
                 self.delete_selected_request_button = ui.button("Delete selected request", on_click=self.delete_selected_request)
+                self.export_selected_request_button = ui.button("Export selected request", on_click=self.export_recharge_request)
 
-        with ui.column().classes("w-1/2"):
+        with ui.column().classes("w-1/3"):
             ui.label("Request items").classes("text-4xl")
             self.request_items_grid = ui.aggrid({
                 'columnDefs': [{"headerName": "account_id", "field": "account_id", "hide": True},
@@ -232,23 +235,49 @@ class UIRechargeRequests:
                 'stopEditingWhenCellsLoseFocus': True,
             })
 
-        self.request_grid.on('rowSelected', self.request_row_selected)
+        with ui.column().classes("w-1/3"):
+            ui.label("Email body").classes("text-4xl")
+            with ui.grid(columns="auto 1fr").classes('w-full'):
+                ui.label("To:")
+                self.email_to = ui.input()
+                ui.label("CC:")
+                self.email_cc = ui.input()
+                ui.label("Subject:")
+                self.email_subject = ui.input("")
+            self.email_body = ui.textarea().classes("w-full").props("input-class=h-96")
+            with ui.row():
+                self.send_email_button = ui.button("Send email", on_click=self.send_email)
+                self.email_spinner = ui.spinner(size='lg')
+
+        self.request_grid.on('rowSelected', self.request_selected)
         self.request_grid.on('cellValueChanged', self.request_edited)
         self.populate_request_grid()
-        self.request_items_grid.on("cellDoubleClicked", self.cell_clicked)
+        self.request_items_grid.on("cellClicked", self.request_item_cell_clicked)
+        self.request_items_grid.on("cellDoubleClicked", self.request_item_cell_double_clicked)
+        self.email_spinner.visible = False
 
     async def get_selected_recharge_id(self) -> Optional[str]:
+        """Get the ID of the selected RechargeRequest."""
         selected_row = await(self.request_grid.get_selected_row())
         if selected_row is None:
             return None
         return selected_row["id"]
 
-    def request_row_selected(self, event: nicegui.events.GenericEventArguments):
+    async def get_selected_request_item_account(self) -> Optional[str]:
+        """Get the ID of the Account corresponding to the selected RechargeRequest item."""
+        selected_row = await(self.request_items_grid.get_selected_row())
+        if selected_row is None:
+            return None
+        return selected_row["account_id"]
+
+    def request_selected(self, event: nicegui.events.GenericEventArguments):
+        """Populate the request item table. Triggered by selection of a row in the RechargeRequest table."""
         if event.args["selected"] is True:
             self.populate_request_items_grid(event.args["data"]["id"])
 
     @staticmethod
     def request_edited(event: nicegui.events.GenericEventArguments):
+        """Save changes to a RechargeRequest after it is edited in the RechargeRequest table."""
         request_id = event.args["data"]["id"]
         request = RechargeRequest.get(id=request_id)
         request.status = event.args["data"]["status"]
@@ -256,8 +285,8 @@ class UIRechargeRequests:
         request.save()
 
     def populate_request_grid(self):
-        requests: Iterable[RechargeRequest] = RechargeRequest.select()
-        request_details = [request.to_json() for request in requests]
+        recharge_requests: Iterable[RechargeRequest] = RechargeRequest.select()
+        request_details = [request.to_json() for request in recharge_requests]
         self.request_grid.options["rowData"] = request_details
         self.request_grid.update()
 
@@ -290,20 +319,9 @@ class UIRechargeRequests:
             ui.notify("No recharge request selected to export.")
             return 0
 
-        recharge_data = self.request_items_grid.options["rowData"]
-
         request_id = selected_row["id"]
-        transactions = (Transaction.select(Transaction, Account, Person)
-                        .join(Account)
-                        .join(Person)
-                        .where(Transaction.recharge_request == request_id))
-        usage = (MonthlyUsage.select(MonthlyUsage, Account, Person)
-                 .join(Account)
-                 .join(Person)
-                 .where(MonthlyUsage.recharge_request == request_id))
-
-        transactions = list(transactions)
-        transactions.extend(list(usage))
+        recharge_request: RechargeRequest = RechargeRequest.get(id=request_id)
+        transactions = recharge_request.get_transactions()
 
         if not transactions:
             ui.notify("Cannot export recharge request as it has no recharges.")
@@ -314,19 +332,79 @@ class UIRechargeRequests:
         for transaction in transactions:
             transaction_dict.setdefault(transaction.account.id, []).append(transaction)
 
-        export_string = "Account Number, Account Name, Budget Holder Name, Budget Holder Email, CC email, Finance Code, Task Code, Total\n"
+        recharge_string = self.generate_recharge_string(transaction_dict)
+        ui.download(bytes(recharge_string, 'utf-8'), f"{recharge_request.reference} export.txt", "text/plain")
+
+    @staticmethod
+    def generate_recharge_string(transaction_dict: dict[int: Transaction]):
+        """Generate a string to be exported as a CSV to submit for journal transfer."""
+        export_string = "Account Name, Finance Code, Task Code, Total\n"
         for account_number, transactions in transaction_dict.items():
             total = Decimal(0)
             for transaction in transactions:
                 total += transaction.gross_total_pound
             total = round(total, 2)
             account = transactions[0].account
-            export_string += f"{account_number}, {account.name}, {account.budget_holder.first_name}, {account.budget_holder.email}, , {account.finance_code}, {account.task_code}, {total}\n"
+            export_string += f"{account.name}, {account.finance_code}, {account.task_code}, {total}\n"
+        return export_string
 
-        recharge_request = RechargeRequest.get(id=request_id)
-        ui.download(bytes(export_string, 'utf-8'), f"{recharge_request.reference} export.txt")
+    @staticmethod
+    def generate_recharge_email(transactions: list[Transaction | MonthlyUsage], recharge_request: RechargeRequest) -> str:
+        """Use Jinja to generate the body of the email to send to the customer from a template."""
+        account = transactions[0].account
+        if account.budget_holder is None:
+            ui.notify(f'Error for account "{account.name}" - no budget holder recorded.')
+            return ""
+        data = {"first_name": account.budget_holder.first_name,
+                "account_name": account.name,
+                "account_id": account.id,
+                "recharge_quarter": "4",
+                "recharge_year": "2024",
+                "start_balance": account.get_balance(recharge_request.start_date, inclusive=False),
+                "transactions": [],
+                "end_balance": account.get_balance(recharge_request.end_date),
+                "finance_code": account.finance_code,
+                "task_code": account.task_code,
+                "recharge_start_date": recharge_request.start_date,
+                "recharge_end_date": recharge_request.end_date,
+                "recharge_date": (datetime.date.today() + datetime.timedelta(days=14)).strftime("%d/%m/%y")}
+        for transaction in transactions:
+            data["transactions"].append({"date": transaction.date, "type": TRANSACTION_TYPES[transaction.type],
+                                         "amount": transaction.gross_total_pound, "note": transaction.note})
+        env = jinja2.Environment(loader=jinja2.PackageLoader("aam"), undefined=jinja2.StrictUndefined)
+        template = env.get_template("email_base.jinja")
+        return template.render(data=data)
 
-    def cell_clicked(self, event: nicegui.events.GenericEventArguments):
+    async def send_email(self):
+        """Email a customer and add a Note to the Account with the content of the email."""
+        self.email_spinner.visible = True
+        account_id = await(self.get_selected_request_item_account())
+        to = self.email_to.value
+        cc = self.email_cc.value
+        subject = self.email_subject.value
+        body: str = self.email_body.value
+        html_body = body.replace("\n", "<br>")
+        payload = {"to": to, "cc": cc, "subject": subject, "body": html_body}
+        response = requests.post(CONFIG["email_url"], json=payload)
+        note_text = f"to: {to}\ncc:{cc}\nsubject: {subject}\n\n{body}"
+        Note.create(date=datetime.date.today(), text=note_text, type="Sent email", account=account_id)
+        self.email_spinner.visible = False
+        ui.notify(f"Email request response status code: {response.status_code}")
+
+    async def request_item_cell_clicked(self, event: nicegui.events.GenericEventArguments):
+        account_id = event.args["data"]["account_id"]
+        recharge_id = await(self.get_selected_recharge_id())
+        recharge_request: RechargeRequest = RechargeRequest.get(recharge_id)
+        transactions = recharge_request.get_transactions(account_id)
+        email_body = self.generate_recharge_email(transactions, recharge_request)
+
+        self.email_to.set_value(transactions[0].account.budget_holder.email)
+        self.email_cc.set_value("")
+        self.email_subject.set_value(f"Research IT AWS account recharge - {transactions[0].account.name}")
+        self.email_body.set_value(email_body)
+
+
+    def request_item_cell_double_clicked(self, event: nicegui.events.GenericEventArguments):
         account: Account = Account.get(Account.id == event.args["data"]["account_id"])
         self.parent.parent.change_selected_organization(account.organization_id)
         self.parent.parent.change_selected_account(account.id)
@@ -359,9 +437,7 @@ class UIRechargeRequests:
                                             "transaction_total": 0, "num_transactions": 0,
                                             "start_balance": start_balance, "end_balance": end_balance}
                 accounts[account_id]["transaction_total"] += item.gross_total_pound
-                accounts[account_id]["transaction_ids"] += item.id
                 accounts[account_id]["num_transactions"] += 1
-
 
             # Unpack dict to list to display in grid
             accounts = [value for value in accounts.values()]

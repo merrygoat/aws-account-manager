@@ -3,3 +3,5 @@ nicegui
 boto3
 python-dateutil
 pyyaml
+jinja2
+requests

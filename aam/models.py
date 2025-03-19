@@ -18,7 +18,7 @@ import aam.utilities
 # Pragmas ensures foreign key constraints are enabled - they are disabled by default in SQLite.
 db = peewee.SqliteDatabase('data.db', pragmas={'foreign_keys': 1})
 
-TRANSACTION_TYPES = ["Pre-pay", "Savings Plan", "Adjustment", "Recharge", "Starting Balance", "Unrecovered spend"]
+TRANSACTION_TYPES = ["Pre-pay", "Savings Plan", "Adjustment", "Recharge", "Starting Balance", "Unrecovered spend", "Monthly Usage"]
 
 class BaseModel(peewee.Model):
     class Meta:
@@ -81,6 +81,24 @@ class RechargeRequest(BaseModel):
     def to_json(self):
         return {"id": self.id, "start_date": self.start_date, "end_date": self.end_date, "reference": self.reference,
                 "status": self.status}
+
+    def get_transactions(self, account_id: str = None) -> list:
+        """Get Transaction and MonthlyUsage items associated with the """
+        object_types = [Transaction, MonthlyUsage]
+        items = []
+
+        for object_type in object_types:
+            if account_id is None:
+                where_expression = object_type.recharge_request == self.id
+            else:
+                where_expression = (object_type.recharge_request == self.id) & (Account.id == account_id)
+
+            items.extend(list((object_type.select(object_type, Account, Person)
+                               .join(Account)
+                               .join(Person, JOIN.LEFT_OUTER)
+                               .where(where_expression))))
+        return items
+
 
 class Account(BaseModel):
     id = peewee.CharField(primary_key=True)
@@ -213,6 +231,7 @@ class Note(BaseModel):
     id = peewee.AutoField()
     date = peewee.DateField()
     text = peewee.CharField()
+    type = peewee.CharField()
     account = peewee.ForeignKeyField(Account, backref="notes")
 
 class MonthlyUsage(BaseModel):
@@ -229,17 +248,17 @@ class MonthlyUsage(BaseModel):
     note = peewee.CharField(null=True)
 
     def to_json(self) -> dict:
-        details = {"id": self.id, "account_id": self.account_id, "type": self.type, "date": self.date, "amount": self.amount,
-                   "shared_charge": self.shared_charge, "support_charge": self.support_charge, "currency": "$",
-                   "gross_total_dollar": self.gross_total_dollar, "gross_total_pound": self.gross_total_pound,
-                   "note": self.note}
+        details = {"id": self.id, "account_id": self.account_id, "type": TRANSACTION_TYPES[self.type],
+                   "date": self.date, "amount": self.amount, "shared_charge": self.shared_charge,
+                   "support_charge": self.support_charge, "currency": "$", "gross_total_dollar": self.gross_total_dollar,
+                   "gross_total_pound": self.gross_total_pound, "note": self.note}
         if self.recharge_request:
             details["reference"] = f"Recharge - {self.recharge_request.reference}"
         return details
 
     @property
-    def type(self) -> str:
-        return "Monthly"
+    def type(self) -> int:
+        return TRANSACTION_TYPES.index("Monthly Usage")
 
     @property
     def support_eligible(self) -> bool:
@@ -295,8 +314,6 @@ class Transaction(BaseModel):
         if self.support_eligible and self.amount:
             if self.type == TRANSACTION_TYPES.index("Savings Plan"):
                 return self.amount * Decimal(0.1)
-            elif self.type == TRANSACTION_TYPES.index("Monthly"):
-                return (self.amount + self.shared_charge) * Decimal(0.1)
         return Decimal(0)
 
     def to_json(self) -> dict:

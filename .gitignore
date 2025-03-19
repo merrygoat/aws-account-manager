@@ -6,3 +6,4 @@ __pycache__
 /data.db
 /config.yaml
 /data.db.bak
+/aam/templates/email_base.jinja

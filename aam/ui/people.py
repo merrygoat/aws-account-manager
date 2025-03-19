@@ -50,7 +50,8 @@ class UIPeople:
         ui.notify("Person details updated.")
 
     def populate_select(self):
-        people = {person.id: f"{person.first_name} {person.last_name}" for person in Person.select()}
+        people = sorted(list(Person.select()),key=lambda item: item.first_name)
+        people = {person.id: f"{person.first_name} {person.last_name}" for person in people}
         self.person_select.set_options(people)
         
     def show_person_details(self, event: nicegui.events.ValueChangeEventArguments):
