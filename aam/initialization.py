@@ -1,12 +1,15 @@
 import datetime
+import logging
 
 from nicegui import ui
 
 import aam.utilities
+from aam.config import CONFIG
 from aam.models import Month
 
 
 def initialize():
+    logging_init()
     add_months()
     ui.input.default_props("dense outlined")
     ui.textarea.default_props("outlined")
@@ -21,3 +24,9 @@ def add_months():
 
     for month_code in missing_months:
         Month.create(month_code=month_code, exchange_rate=1)
+
+def logging_init():
+    if CONFIG["debug"]:
+        logger = logging.getLogger('peewee')
+        logger.addHandler(logging.StreamHandler())
+        logger.setLevel(logging.DEBUG)

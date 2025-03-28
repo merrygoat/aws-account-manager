@@ -14,11 +14,6 @@ from aam.ui.people import UIPeople
 from aam.ui.shared_charges import UISharedCharges
 from aam.utilities import load_icon
 
-import logging
-logger = logging.getLogger('peewee')
-logger.addHandler(logging.StreamHandler())
-logger.setLevel(logging.DEBUG)
-
 
 def main():
     app.on_exception(lambda e: ui.notify(f"Exception: {e}"))

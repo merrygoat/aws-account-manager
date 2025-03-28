@@ -61,7 +61,7 @@ class UIAccountNotes:
             return 0
 
         if note.type != "Internal":
-            ui.notify(f"Can not delete notes of type '{Note.type}'")
+            ui.notify(f"Can not delete notes of type '{note.type}'")
             return 0
 
         note.delete_instance()

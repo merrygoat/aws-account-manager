@@ -14,9 +14,10 @@ import peewee
 from peewee import JOIN
 
 import aam.utilities
+from aam.config import CONFIG
 
 # Pragmas ensures foreign key constraints are enabled - they are disabled by default in SQLite.
-db = peewee.SqliteDatabase('data.db', pragmas={'foreign_keys': 1})
+db = peewee.SqliteDatabase(CONFIG["db_location"], pragmas={'foreign_keys': 1})
 
 TRANSACTION_TYPES = ["Pre-pay", "Savings Plan", "Adjustment", "Recharge", "Starting Balance", "Unrecovered spend", "Monthly Usage"]
 
