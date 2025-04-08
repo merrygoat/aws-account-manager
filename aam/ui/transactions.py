@@ -321,31 +321,31 @@ class UIRechargeRequests:
 
         request_id = selected_row["id"]
         recharge_request: RechargeRequest = RechargeRequest.get(id=request_id)
-        transactions = recharge_request.get_transactions()
 
-        if not transactions:
+        recharge_items = self.request_items_grid.options['rowData']
+        if not recharge_items:
             ui.notify("Cannot export recharge request as it has no recharges.")
             return 0
 
-        # Group transactions by account
-        transaction_dict = {}
-        for transaction in transactions:
-            transaction_dict.setdefault(transaction.account.id, []).append(transaction)
+        # Put items into dict by account id
+        item_dict = {item["account_id"]: item for item in recharge_items}
 
-        recharge_string = self.generate_recharge_string(transaction_dict)
+        # Get the finance codes for each item
+        account_ids = list(item_dict.keys())
+        codes = Account.select(Account.id, Account.finance_code, Account.task_code).where(Account.id.in_(account_ids)).dicts()
+        for account in codes:
+            item_dict[account["id"]]["finance_code"] = account["finance_code"]
+            item_dict[account["id"]]["task_code"] = account["task_code"]
+
+        recharge_string = self.generate_recharge_string(item_dict)
         ui.download(bytes(recharge_string, 'utf-8'), f"{recharge_request.reference} export.txt", "text/plain")
 
     @staticmethod
-    def generate_recharge_string(transaction_dict: dict[int: Transaction]):
+    def generate_recharge_string(request_items: dict[str: dict]):
         """Generate a string to be exported as a CSV to submit for journal transfer."""
         export_string = "Account Name, Finance Code, Task Code, Total\n"
-        for account_number, transactions in transaction_dict.items():
-            total = Decimal(0)
-            for transaction in transactions:
-                total += transaction.gross_total_pound
-            total = round(total, 2)
-            account = transactions[0].account
-            export_string += f"{account.name}, {account.finance_code}, {account.task_code}, {total}\n"
+        for account_id, row in request_items.items():
+            export_string += f"{row['account_name']}, {row["finance_code"]}, {row["task_code"]}, {round(row["end_balance"], 2)}\n"
         return export_string
 
     @staticmethod
