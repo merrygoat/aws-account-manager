@@ -150,7 +150,7 @@ class UITransactions:
         ui.notify(f"Transaction {cell_edited} updated.")
 
     def _validate_cell_change(self, event: nicegui.events.GenericEventArguments) -> bool:
-        """Validate whether a change made to the Transaction gird is valid.
+        """Validate whether a change made to the Transaction grid is valid.
 
         :param event: The data from the cellValueChanged AGGrid event.
 

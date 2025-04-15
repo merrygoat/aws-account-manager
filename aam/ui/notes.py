@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING, Iterable, Optional
 import nicegui.events
 from nicegui import ui
 
-import aam.utilities
 from aam.models import Note
 
 if TYPE_CHECKING:
@@ -20,7 +19,7 @@ class UIAccountNotes:
         ui.html("Notes").classes("text-xl")
         self.notes_grid = ui.aggrid({
             'columnDefs': [{"headerName": "id", "field": "id", "hide": True},
-                           {"headerName": "Date", "field": "date"},
+                           {"headerName": "Date", "field": "date", "editable": True},
                            {"headerName": "Type", "field": "type"},
                            {"headerName": "Note", "field": "text", "width": "flex"}],
             'rowData': {},
@@ -34,6 +33,7 @@ class UIAccountNotes:
             ui.button('Save note', on_click=self.save_note)
             ui.button('Delete note', on_click=self.delete_note)
         self.notes_grid.on("cellClicked", self.note_selected)
+        self.notes_grid.on("cellValueChanged", self.update_note)
 
     async def get_selected_note(self) -> Optional[Note]:
         note_row = await(self.notes_grid.get_selected_row())
@@ -53,6 +53,31 @@ class UIAccountNotes:
             self.add_note_dialog.open(selected_account_id)
         else:
             ui.notify("No account selected to add note.")
+
+    def update_note(self, event: nicegui.events.GenericEventArguments):
+        """When an edit is made to a row in the note grid, save the changes to the database."""
+        valid_cell_types = ["date"]
+        note_id = event.args["data"]["id"]
+        cell_edited = event.args["colId"]
+
+
+        if cell_edited not in valid_cell_types:
+            ui.notify(f"Unable to edit cell type '{cell_edited}'")
+            return 0
+
+        note: Note = Note.get(Note.id == note_id)
+
+        if cell_edited == "date":
+            if note.type == "Internal":
+                note.date = datetime.date.fromisoformat(event.args["data"]["date"])
+            else:
+                ui.notify(f"Unable to change date for note type: '{note.type}'")
+                return 0
+
+        note.save()
+        ui.notify(f"Note {cell_edited} edited.")
+        self.update_note_grid()
+
 
     async def delete_note(self):
         note = await(self.get_selected_note())
@@ -133,7 +158,7 @@ class AddNoteDialog:
                     ui.button("Cancel", on_click=self.close)
 
     def save_new_note(self, _event: nicegui.events.ClickEventArguments):
-        date = self.date.value
+        date = datetime.date.fromisoformat(self.date.value)
         text = self.text.value
         Note.create(date=date, text=text, account=self.selected_account_id, type="Internal")
         self.close()
