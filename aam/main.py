@@ -5,6 +5,7 @@ from nicegui import ui, app
 from aam import initialization
 from aam.models import Account
 from aam.ui.data_quality import UIDataQuality
+from aam.ui.statistics import UIStatistics
 from aam.ui.transactions import UITransactions
 from aam.ui.import_data import UIImport
 from aam.ui.settings import UISettings
@@ -47,6 +48,7 @@ class UIMainForm:
                     self.shared_charges_tab = ui.tab('Shared Charges', icon='attach_money')
                     self.import_tab = ui.tab('Import', icon='publish')
                     self.data_quality_tab = ui.tab('Data Quality', icon='verified')
+                    self.stats_tab = ui.tab('Statistics', icon='query_stats')
                     self.people_tab = ui.tab('People', icon='face')
                     self.settings_tab = ui.tab('Settings', icon='settings')
             with splitter.after:
@@ -61,6 +63,8 @@ class UIMainForm:
                         self.import_data = UIImport(self)
                     with ui.tab_panel(self.data_quality_tab):
                         self.data_quality = UIDataQuality(self)
+                    with ui.tab_panel(self.stats_tab):
+                        self.stats = UIStatistics(self)
                     with ui.tab_panel(self.people_tab):
                         self.people = UIPeople(self)
                     with ui.tab_panel(self.settings_tab):
