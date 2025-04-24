@@ -333,7 +333,7 @@ class UIImport:
         for line in processed_lines:
             account_id = Account.get(Account.name == line[2]).id
             transaction_type = TRANSACTION_TYPES.index(line[3])
-            Transaction.create(account=account_id, date=line[1], amount=line[7], _type=transaction_type,  is_pound=True, note=line[4],
+            Transaction.create(account=account_id, date=line[1], amount=line[7], type=transaction_type,  is_pound=True, note=line[4],
                                reference=line[0], project_code=line[5], task_code=line[6])
 
         self.parent.transactions.update_transaction_grid()

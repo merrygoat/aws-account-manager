@@ -78,7 +78,6 @@ class UIAccountNotes:
         ui.notify(f"Note {cell_edited} edited.")
         self.update_note_grid()
 
-
     async def delete_note(self):
         note = await(self.get_selected_note())
         if note is None:

@@ -8,7 +8,7 @@ from nicegui import ui
 from peewee import JOIN, fn
 
 import aam.utilities
-from aam.models import SharedCharge, Account, Month, AccountJoinSharedCharge, MonthlyUsage
+from aam.models import SharedCharge, Account, AccountJoinSharedCharge, MonthlyUsage
 
 if TYPE_CHECKING:
     from aam.main import UIMainForm
