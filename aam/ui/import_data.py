@@ -11,7 +11,7 @@ from aam.models import Account, Month, Person, Sysadmin, MonthlyUsage, TRANSACTI
 from aam.utilities import month_select, year_select
 
 if TYPE_CHECKING:
-    from aam.main import UIMainForm
+    from aam.ui.main import UIMainForm
 
 
 class UIImport:

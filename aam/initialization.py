@@ -2,19 +2,32 @@ import datetime
 import logging
 
 from nicegui import ui
+from authlib.integrations.starlette_client import OAuth
 
 import aam.utilities
 from aam.config import CONFIG
 from aam.models import Month
 
+oauth = OAuth()
 
 def initialize():
     logging_init()
     add_months()
+    if CONFIG['oauth']["auth"]:
+        oauth_setup()
     ui.input.default_props("dense outlined")
     ui.textarea.default_props("outlined")
     ui.select.default_props("outlined")
     ui.label.default_classes("place-content-center")
+
+def oauth_setup():
+    oauth.register(
+        name=CONFIG['oauth']["provider"],
+        server_metadata_url=CONFIG["oauth"]["metadata_url"],
+        client_id=CONFIG['oauth']["oauth_client_id"],
+        client_secret=CONFIG['oauth']["oauth_client_secret"],
+        client_kwargs={'scope': 'openid email'},
+    )
 
 def add_months():
     """This adds a new Month when the app is started for the first time in a given month."""

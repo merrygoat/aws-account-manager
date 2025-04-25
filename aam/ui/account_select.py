@@ -10,7 +10,7 @@ import aam.aws
 from aam.models import Account, LastAccountUpdate, Organization, Person
 
 if TYPE_CHECKING:
-    from aam.main import UIMainForm
+    from aam.ui.main import UIMainForm
 
 
 class UIAccountSelect:

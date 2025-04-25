@@ -6,7 +6,7 @@ import nicegui.events
 from aam.models import Month, Organization, Account
 
 if TYPE_CHECKING:
-    from aam.main import UIMainForm
+    from aam.ui.main import UIMainForm
 
 
 class UISettings:

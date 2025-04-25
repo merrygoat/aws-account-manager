@@ -8,7 +8,7 @@ from aam.models import Account, Organization, MonthlyUsage, Transaction, TRANSAC
 import aam.utilities
 
 if TYPE_CHECKING:
-    from aam.main import UIMainForm
+    from aam.ui.main import UIMainForm
 
 
 class UIDataQuality:

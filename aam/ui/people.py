@@ -6,7 +6,7 @@ import nicegui.events
 from aam.models import Person
 
 if TYPE_CHECKING:
-    from aam.main import UIMainForm
+    from aam.ui.main import UIMainForm
 
 
 class UIPeople:

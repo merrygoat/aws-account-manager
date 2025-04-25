@@ -10,7 +10,7 @@ from aam.models import Account, Person, Sysadmin, Organization, Transaction, TRA
 from aam.ui.notes import UIAccountNotes
 
 if TYPE_CHECKING:
-    from aam.main import UIMainForm
+    from aam.ui.main import UIMainForm
 
 
 class UIAccountDetails:

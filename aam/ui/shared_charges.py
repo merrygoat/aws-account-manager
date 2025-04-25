@@ -11,7 +11,7 @@ import aam.utilities
 from aam.models import SharedCharge, Account, AccountJoinSharedCharge, MonthlyUsage
 
 if TYPE_CHECKING:
-    from aam.main import UIMainForm
+    from aam.ui.main import UIMainForm
 
 
 class UISharedCharges:

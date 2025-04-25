@@ -14,7 +14,7 @@ from aam.config import CONFIG
 from aam.models import Account, RechargeRequest, Transaction, MonthlyUsage, TRANSACTION_TYPES, Note
 
 if TYPE_CHECKING:
-    from aam.main import UIMainForm
+    from aam.ui.main import UIMainForm
 
 
 class UITransactions:
