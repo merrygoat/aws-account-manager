@@ -53,7 +53,7 @@ class UIImport:
             self.date_pick_grid.set_visibility(False)
         elif import_type == 4:
             self.description.text = ('Data must be in the format, "Account Number, Account Name, Budget holder Name, '
-                                     'Budgetholder email, Sysadmin Name, Sysadmin Email, Finance Code, Task Code,'
+                                     'Budget holder email, Sysadmin Name, Sysadmin Email, Finance Code, Task Code,'
                                      ' Creation Date (YYYY-MM-DD)", with one account per line.')
             self.date_pick_grid.set_visibility(False)
         elif import_type == 5:

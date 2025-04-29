@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Iterable, Optional
 import nicegui.events
 from nicegui import ui
 
+import aam.utilities
 from aam.models import Note
 
 if TYPE_CHECKING:
@@ -141,16 +142,7 @@ class AddNoteDialog:
         with ui.dialog() as self.dialog:
             with ui.card():
                 ui.html("Add Note").classes("text-2xl")
-                with ui.input('Date',
-                              value=datetime.datetime.today().strftime("%d/%m/%y"),
-                              validation={"Must provide date": lambda value: len(value) > 1}
-                              ) as self.date:
-                    with ui.menu().props('no-parent-event') as menu:
-                        with ui.date(mask="DD-MM-YY").bind_value(self.date):
-                            with ui.row().classes('justify-end'):
-                                ui.button('Close', on_click=menu.close).props('flat')
-                    with self.date.add_slot('append'):
-                        ui.icon('edit_calendar').on('click', menu.open).classes('cursor-pointer')
+                self.date = aam.utilities.date_picker(datetime.date.today())
                 self.text = ui.textarea().classes('w-full')
                 with ui.row():
                     ui.button("Save note", on_click=self.save_new_note)
