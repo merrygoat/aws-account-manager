@@ -21,8 +21,9 @@ def initialize():
     ui.label.default_classes("place-content-center")
 
 def oauth_setup():
+    # The value of the name parameter is arbitrary but is needed to call the methods of the OAuth object later.
     oauth.register(
-        name=CONFIG['oauth']["provider"],
+        name="aam_oidc",
         server_metadata_url=CONFIG["oauth"]["metadata_url"],
         client_id=CONFIG['oauth']["oauth_client_id"],
         client_secret=CONFIG['oauth']["oauth_client_secret"],

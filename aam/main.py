@@ -23,9 +23,9 @@ def main():
 
 
 @app.get('/auth')
-async def google_oauth(request: Request) -> RedirectResponse:
+async def oidc_authentication(request: Request) -> RedirectResponse:
     try:
-        user_data = await oauth.google.authorize_access_token(request)
+        user_data = await oauth.aam_oidc.authorize_access_token(request)
     except OAuthError as e:
         print(f'OAuth error: {e}')
         return RedirectResponse('/')  # or return an error page/message
@@ -39,8 +39,8 @@ async def homepage(request: Request) -> Optional[RedirectResponse]:
     if user_data or CONFIG["oauth"]["auth"] is False:
         UIMainForm()
     else:
-        url = request.url_for('google_oauth')
-        return await oauth.google.authorize_redirect(request, url)
+        url = request.url_for('oidc_authentication')
+        return await oauth.aam_oidc.authorize_redirect(request, url)
 
 
 main()
