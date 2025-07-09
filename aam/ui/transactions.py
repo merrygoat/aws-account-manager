@@ -345,7 +345,7 @@ class UIRechargeRequests:
         """Generate a string to be exported as a CSV to submit for journal transfer."""
         export_string = "Account Name, Finance Code, Task Code, Total\n"
         for account_id, row in request_items.items():
-            export_string += f"{row['account_name']}, {row["finance_code"]}, {row["task_code"]}, {round(row["end_balance"], 2)}\n"
+            export_string += f"{row['account_name']}, {row['finance_code']}, {row['task_code']}, {round(row['end_balance'], 2)}\n"
         return export_string
 
     @staticmethod
