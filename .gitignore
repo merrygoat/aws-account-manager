@@ -2,8 +2,10 @@ __pycache__
 /venv
 .idea
 /.idea/
-/aam/data.db
+*.db
 /data.db
 /config.yaml
 /data.db.bak
 /aam/templates/email_base.jinja
+build
+*.egg-info
