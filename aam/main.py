@@ -33,14 +33,23 @@ async def oidc_authentication(request: Request) -> RedirectResponse:
     return RedirectResponse('/')
 
 
+@ui.page('/not_authorised')
+async def not_authorised():
+    ui.label("Authentication was successful but you are not on the allow list.")
+
+
 @ui.page('/')
 async def homepage(request: Request) -> Optional[RedirectResponse]:
     user_data = app.storage.user.get('user_data', None)
-    if user_data or CONFIG["oauth"]["auth"] is False:
+    if CONFIG["oauth"]["auth"] is False:
         UIMainForm()
+    elif user_data is not None:
+        if user_data["userinfo"]["email"] in CONFIG["oauth"]["user_allowlist"]:
+            UIMainForm()
+        else:
+            return await oauth.aam_oidc.authorize_redirect(request, request.url_for('not_authorised'))
     else:
-        url = request.url_for('oidc_authentication')
-        return await oauth.aam_oidc.authorize_redirect(request, url)
+        return await oauth.aam_oidc.authorize_redirect(request, request.url_for('oidc_authentication'))
 
 
 main()

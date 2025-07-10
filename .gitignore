@@ -9,3 +9,4 @@ __pycache__
 /aam/templates/email_base.jinja
 build
 *.egg-info
+.nicegui
