@@ -372,7 +372,7 @@ class UIRechargeRequests:
             data["transactions"].append({"date": transaction.date, "type": TRANSACTION_TYPES[transaction.type],
                                          "amount": transaction.gross_total_pound, "note": transaction.note})
         env = jinja2.Environment(loader=jinja2.PackageLoader("aam"), undefined=jinja2.StrictUndefined)
-        template = env.get_template("email_base.jinja")
+        template = env.get_template(CONFIG["email"]["template_location"])
         return template.render(data=data)
 
     async def send_email(self):
@@ -385,7 +385,7 @@ class UIRechargeRequests:
         body: str = self.email_body.value
         html_body = body.replace("\n", "<br>")
         payload = {"to": to, "cc": cc, "subject": subject, "body": html_body}
-        response = requests.post(CONFIG["email_url"], json=payload)
+        response = requests.post(CONFIG["email"]["send_url"], json=payload)
         note_text = f"to: {to}\ncc:{cc}\nsubject: {subject}\n\n{body}"
         Note.create(date=datetime.date.today(), text=note_text, type="Sent email", account=account_id)
         self.email_spinner.visible = False
