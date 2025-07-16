@@ -371,8 +371,8 @@ class UIRechargeRequests:
         for transaction in transactions:
             data["transactions"].append({"date": transaction.date, "type": TRANSACTION_TYPES[transaction.type],
                                          "amount": transaction.gross_total_pound, "note": transaction.note})
-        env = jinja2.Environment(loader=jinja2.PackageLoader("aam"), undefined=jinja2.StrictUndefined)
-        template = env.get_template(CONFIG["email"]["template_location"])
+        env = jinja2.Environment(loader=jinja2.FileSystemLoader(CONFIG["email"]["template_location"]), undefined=jinja2.StrictUndefined)
+        template = env.get_template("email_base.jinja")
         return template.render(data=data)
 
     async def send_email(self):
