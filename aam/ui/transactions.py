@@ -11,7 +11,7 @@ import requests
 
 from aam import utilities
 from aam.config import CONFIG
-from aam.models import Account, RechargeRequest, Transaction, MonthlyUsage, TRANSACTION_TYPES, Note
+from aam.models import Account, RechargeRequest, Transaction, MonthlyUsage, TRANSACTION_TYPES, Note, Month
 
 if TYPE_CHECKING:
     from aam.ui.main import UIMainForm
@@ -548,12 +548,19 @@ class UINewRechargeDialog:
     def new_recharge_request(self, _event: nicegui.events.ClickEventArguments):
         """Get the information the user has input to the Dialog and use it to create a new RechargeRequest."""
         start_date = datetime.date(self.start_year.value, self.start_month.value, 1)
-        last_day = calendar.monthrange(self.end_year.value, self.end_month.value)[1]
-        end_date = datetime.date(self.end_year.value, self.end_month.value, last_day)
+        end_date = datetime.date(self.end_year.value, self.end_month.value, calendar.monthrange(self.end_year.value, self.end_month.value)[1])
+        start_month_code = utilities.month_code(self.start_year.value, self.start_month.value)
+        end_month_code = utilities.month_code(self.end_year.value, self.end_month.value)
 
         if end_date < start_date:
             ui.notify("End month must be after start month.")
             return 0
+
+        months = Month.select().where((Month.month_code >= start_month_code) & (Month.month_code <= end_month_code))
+        for month in months:
+            if month.exchange_rate == 1:
+                ui.notify(f"Exchange rate is 1 for month {utilities.date_from_month_code(month.month_code).strftime('%b-%Y')}. Must set exchange rate before creating recharge request.")
+                return 0
 
         if self.reference_input.value != "":
             recharge_request = RechargeRequest.create(start_date=start_date, end_date=end_date,
@@ -561,6 +568,7 @@ class UINewRechargeDialog:
         else:
             ui.notify("Must provide a reference")
             return 0
+
 
         self.add_transactions_to_request(start_date, end_date, recharge_request)
 
