@@ -1,0 +1,29 @@
+# This contains one key, value pair for each organization you plan to monitor.
+# The key name is the AWS Organization Id, the value is the name of an IAM role which the application will assume.
+# The IAM role must have permission for the organizations:DescribeOrganization action which allows collection of account names and status.
+organization_list_role_arns:
+  o-abc123def: "arn:aws:iam::123456789012:role/Org_Describe_Accounts"
+  o-def345abc: "arn:aws:iam::99887766:role/Org_Describe_Accounts"
+
+email:
+    # The location of the template folder containing the jinja template for the email
+    template_location: /opt/aam/templates
+    # This is the url of the PowerAutomate http endpoint which allows the sending of emails.
+    send_url: "https://exampleurl.azure.com"
+
+# The path to the database relative to the working directory of the application
+db_location: "data.db"
+
+# If true, will print the SQL transactions of the ORM to the console. Useful for debugging slow DB operations.
+debug: True
+
+# Details of the oauth provider. If "auth" is set to "False", will not use oauth.
+# If "auth" is "True", then must set the other parameters to set up the oauth connection.
+oauth:
+  auth: False
+  provider: google
+  metadata_url:
+  oauth_client_id:
+  oauth_client_secret:
+  # A list of people who are given access by the oauth provider
+  user_allowlist: ["person1@gmail.com", person2@gmail.com]
