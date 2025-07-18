@@ -199,7 +199,7 @@ class Account(BaseModel):
     @property
     def final_date(self) -> datetime.date:
         """Return the final date on which the account is active."""
-        if self.closure_date:
+        if self.closure_date and self.closure_date <= datetime.date.today():
             return self.closure_date
         else:
             return datetime.date.today()
