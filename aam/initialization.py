@@ -33,8 +33,8 @@ def oauth_setup():
 def add_months():
     """This adds a new Month when the app is started for the first time in a given month."""
     required_months = aam.utilities.get_months_between(datetime.date(2021, 1, 1), datetime.date.today())
-    actual_months = [month.month_code for month in Month.select()]
-    missing_months = set(required_months) - set(actual_months)
+    actual_months: list[Month] = [month for month in Month.select()]
+    missing_months = set(required_months) - set([month.month_code for month in actual_months])
 
     for month_code in missing_months:
         Month.create(month_code=month_code, exchange_rate=1)

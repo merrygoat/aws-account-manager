@@ -1,6 +1,7 @@
 import calendar
 import datetime
 import re
+from typing import Optional
 
 from nicegui import ui
 
@@ -24,13 +25,53 @@ def date_picker(initial_value: datetime.date = None) -> ui.input:
 
     return date_input
 
+class MonthYearPicker:
+    """A custom gui element which adds two select elements to allow picking a month and a year."""
+    def __init__(self, vertical: bool = False) -> None:
+        with ui.row():
+            self._month = month_select()
+            self._year = year_select()
+
+    @property
+    def month(self) -> Optional[int]:
+        if self._month.value:
+            return self._month.value
+        else:
+            return None
+
+    @property
+    def year(self) -> Optional[int]:
+        if self._year.value:
+            return int(self._year.value)
+        else:
+            return None
+
+    @property
+    def month_code(self) -> Optional[int]:
+        if self._month.value and self._year.value:
+            return month_code(self._year.value, self._month.value)
+        else:
+            return None
+
+    def set_visibility(self, visible: bool):
+        if visible:
+            self._month.set_visibility(True)
+            self._year.set_visibility(True)
+        else:
+            self._month.set_visibility(False)
+            self._year.set_visibility(False)
+
+    def set_value(self, month: int, year: int):
+        self._month.set_value(month)
+        self._year.set_value(year)
+
 
 def month_select() -> ui.select:
-    return ui.select(options={index + 1: month for index, month in enumerate(calendar.month_abbr[1:])}).props("dense").classes("min-w-[120px]")
+    return ui.select(options={index + 1: month for index, month in enumerate(calendar.month_abbr[1:])}, label="Month").props("dense").classes("min-w-[120px]")
 
 
 def year_select() -> ui.select:
-    return ui.select(options=list(range(2021, datetime.date.today().year + 1))).props("dense").classes("min-w-[120px]")
+    return ui.select(options=list(range(2021, datetime.date.today().year + 1)), label="Year").props("dense").classes("min-w-[120px]")
 
 
 def month_code(year: int, month: int) -> int:

@@ -45,11 +45,11 @@ class UISharedCharges:
 
         self.populate_shared_charges_table()
 
-    def add_new_shared_charge(self, event: nicegui.events.ClickEventArguments):
+    def add_new_shared_charge(self, _: nicegui.events.ClickEventArguments):
         self.shared_charge_dialog.header.set_text("Add New Shared Charge")
         self.shared_charge_dialog.open(mode="new")
 
-    async def edit_selected(self, event: nicegui.events.ClickEventArguments):
+    async def edit_selected(self, _: nicegui.events.ClickEventArguments):
         selected_row = await self.shared_charges_table.get_selected_row()
         if selected_row is None:
             ui.notify("No shared charge selected to edit.")
@@ -58,7 +58,7 @@ class UISharedCharges:
             self.shared_charge_dialog.header.set_text("Editing existing Shared Charge")
             self.shared_charge_dialog.open(shared_charge, mode="edit")
 
-    async def duplicate_selected(self, event: nicegui.events.ClickEventArguments):
+    async def duplicate_selected(self, _: nicegui.events.ClickEventArguments):
         selected_row = await self.shared_charges_table.get_selected_row()
         if selected_row is None:
             ui.notify("No shared charge selected to duplicate.")
@@ -67,7 +67,7 @@ class UISharedCharges:
             self.shared_charge_dialog.header.set_text("Add New Shared Charge")
             self.shared_charge_dialog.open(shared_charge, mode="duplicate")
 
-    async def delete_selected(self, event: nicegui.events.ClickEventArguments):
+    async def delete_selected(self, _: nicegui.events.ClickEventArguments):
         """Delete the selected SharedCharge and recalculate the SharedCharge amounts """
         selected_row = await self.shared_charges_table.get_selected_row()
         if selected_row is None:
@@ -119,10 +119,8 @@ class UISharedChargeDialog:
                 with ui.grid(columns="auto auto"):
                     ui.label("Name")
                     self.name = ui.input()
-                    ui.label("Month")
-                    self.month = aam.utilities.month_select()
-                    ui.label("Year")
-                    self.year = aam.utilities.year_select()
+                    ui.label("Date")
+                    self.month_year_picker = aam.utilities.MonthYearPicker()
                     ui.label("Amount ($)")
                     self.amount = ui.input(validation=lambda value: 'Invalid format' if re.fullmatch(r"\d*.\d*", value) is None else None)
                     ui.label("Accounts")
@@ -150,13 +148,13 @@ class UISharedChargeDialog:
         accounts = {account.id: account.name for account in accounts}
         self.account_select.set_options(accounts)
 
-    def save_shared_charge(self, event: nicegui.events.ClickEventArguments):
+    def save_shared_charge(self, _: nicegui.events.ClickEventArguments):
         """Take the information from the dialog and use it to either update an existing SharedCharge if editing or
         create a new SharedCharge if creating a new one."""
         if not self.validate_inputs():
             return 0
 
-        date = datetime.date(self.year.value, self.month.value, 1)
+        date = datetime.date(self.month_year_picker.year, self.month_year_picker.month, 1)
         amount = decimal.Decimal(self.amount.value)
 
         affected_accounts: list[str] = []
@@ -218,8 +216,7 @@ class UISharedChargeDialog:
             account_ids = [account["id"] for account in accounts]
 
             self.name.set_value(shared_charge.name)
-            self.month.set_value(shared_charge.date.month)
-            self.year.set_value(shared_charge.date.year)
+            self.month_year_picker.set_value(shared_charge.date.month, shared_charge.date.year)
             self.amount.set_value(str(shared_charge.amount))
             self.account_select.set_value(account_ids)
 

@@ -29,9 +29,9 @@ class UIStatistics:
                     self.show_suspended = ui.switch("Show Suspended", on_change=self.update_account_select_options)
         with ui.row():
             ui.label("Start date")
-            self.start_date = aam.utilities.date_picker(datetime.date.today() - datetime.timedelta(days=90))
+            self.start_date = aam.utilities.MonthYearPicker()
             ui.label("End date")
-            self.end_date = aam.utilities.date_picker(datetime.date.today())
+            self.end_date = aam.utilities.MonthYearPicker()
         self.calculate_usage = ui.button("Calculate Usage", on_click=self.calculate_usage)
         with ui.row():
             ui.label("Total monthly usage:")
@@ -70,18 +70,18 @@ class UIStatistics:
         self.account_select.update()
 
     def calculate_usage(self, event: nicegui.events.ClickEventArguments):
-        if not self.start_date.value:
+        if not (self.start_date.month or self.start_date.year):
             ui.notify("Must select a start date")
             return 0
-        if not self.end_date.value:
+        if not (self.end_date.month or self.end_date.year):
             ui.notify("Must select an end date")
             return 0
         if not self.account_select.value:
             ui.notify("No account selected.")
             return 0
 
-        start_date = datetime.date.fromisoformat(self.start_date.value)
-        end_date = datetime.date.fromisoformat(self.end_date.value)
+        start_month_code = self.start_date.month_code
+        end_month_code = self.end_date.month_code
 
         selected_accounts = self.account_select.value
 
@@ -89,8 +89,8 @@ class UIStatistics:
                                                 .join(Account)
                                                 .join_from(MonthlyUsage, Month)
                                                 .where((Account.id.in_(selected_accounts) &
-                                                        (MonthlyUsage.date > start_date) &
-                                                        (MonthlyUsage.date < end_date))
+                                                        (MonthlyUsage.month_id >= start_month_code) &
+                                                        (MonthlyUsage.month_id <= end_month_code))
                                                        )
                                                 )
         total = decimal.Decimal(0)

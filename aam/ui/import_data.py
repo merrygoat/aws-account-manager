@@ -8,7 +8,6 @@ from nicegui import ui
 
 import aam.utilities
 from aam.models import Account, Month, Person, Sysadmin, MonthlyUsage, TRANSACTION_TYPES, Transaction
-from aam.utilities import month_select, year_select
 
 if TYPE_CHECKING:
     from aam.ui.main import UIMainForm
@@ -21,11 +20,7 @@ class UIImport:
         self.import_type = ui.select({1: "Monthly Usage - One month, multiple account", 2:"Monthly usage - One account, multiple months", 3:"Exchange Rate", 4:"Account Details", 5: "Transactions"},
                                      label="Import Type", value=1, on_change=self.import_type_selected)
         self.description = ui.label("").style('white-space: pre-wrap')
-        with ui.grid(columns="auto auto").classes("place-items-center gap-1") as self.date_pick_grid:
-            ui.label("Month")
-            ui.label("Year")
-            self.month = month_select()
-            self.year = year_select()
+        self.date_select = aam.utilities.MonthYearPicker()
         self.import_textbox = ui.textarea("Raw data").classes("w-1/2")
         self.import_button = ui.button("Import data", on_click=self.import_data)
 
@@ -38,7 +33,7 @@ class UIImport:
         if import_type == 1:
             self.description.text = ('Data must be in the format: "account number, transaction amount" with one account '
                                      'per line. Comma or tab can be use as field separators.')
-            self.date_pick_grid.set_visibility(True)
+            self.date_select.set_visibility(True)
         elif import_type == 2:
             self.description.text = ('Data must be tab delimited in the format, "Month-year   amount ($)", with one '
                                      'month per line and the account number on its own on the first line.\n'
@@ -46,20 +41,20 @@ class UIImport:
                                      'values.'
                                      )
             self.description.text = ()
-            self.date_pick_grid.set_visibility(False)
+            self.date_select.set_visibility(False)
         elif import_type == 3:
             self.description.text = ('Data must be in the format, "Month-year, exchange_rate", with one month per line.'
                                      'e.g "Mar-23, 0.756473".')
-            self.date_pick_grid.set_visibility(False)
+            self.date_select.set_visibility(False)
         elif import_type == 4:
             self.description.text = ('Data must be in the format, "Account Number, Account Name, Budget holder Name, '
                                      'Budget holder email, Sysadmin Name, Sysadmin Email, Finance Code, Task Code,'
                                      ' Creation Date (YYYY-MM-DD)", with one account per line.')
-            self.date_pick_grid.set_visibility(False)
+            self.date_select.set_visibility(False)
         elif import_type == 5:
             self.description.text = ('Data must be in the format, "Transaction reference, Transaction Date, AWS account Name, '
                                      'Transaction Type, Note, Finance Code, Task Code, amount", with one transaction per line.')
-            self.date_pick_grid.set_visibility(False)
+            self.date_select.set_visibility(False)
 
     def import_data(self, event: nicegui.events.ClickEventArguments):
         data = self.import_textbox.value
@@ -107,11 +102,11 @@ class UIImport:
 
         processed_lines = []
 
-        if not self.month.value:
+        if not self.date_select.month:
             ui.notify("Must select month.")
             return 0
 
-        if not self.year.value:
+        if not self.date_select.year:
             ui.notify("Must select year.")
             return 0
 
@@ -152,7 +147,7 @@ class UIImport:
             processed_lines.append(line)
         ui.notify("Data is valid.")
 
-        month_code = aam.utilities.month_code(self.year.value, self.month.value)
+        month_code = self.date_select.month_code
 
         for line in processed_lines:
             usage = MonthlyUsage.get_or_none(account=line[0], month=month_code)

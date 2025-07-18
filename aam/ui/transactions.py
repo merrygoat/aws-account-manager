@@ -9,6 +9,7 @@ import nicegui.events
 from nicegui import ui
 import requests
 
+import aam.utilities
 from aam import utilities
 from aam.config import CONFIG
 from aam.models import Account, RechargeRequest, Transaction, MonthlyUsage, TRANSACTION_TYPES, Note, Month
@@ -525,18 +526,12 @@ class UINewRechargeDialog:
                     self.date_input = utilities.date_picker(datetime.date.today())
                     ui.label("Reference")
                     self.reference_input = ui.input(validation={"Must provide reference": lambda value: len(value) > 1})
-                    with ui.row():
-                        ui.label("Start month")
-                        self.start_month = utilities.month_select()
-                    with ui.row():
-                        ui.label("Start year")
-                        self.start_year = utilities.year_select()
-                    with ui.row():
-                        ui.label("End month")
-                        self.end_month = utilities.month_select()
-                    with ui.row():
-                        ui.label("End year")
-                        self.end_year = utilities.year_select()
+                with ui.grid(columns="auto auto"):
+                    ui.label("Start date")
+                    self.start_date = aam.utilities.MonthYearPicker()
+                    ui.label("End date")
+                    self.end_date = aam.utilities.MonthYearPicker()
+                with ui.row(align_items="stretch").classes('w-full'):
                     ui.button("Add", on_click=self.new_recharge_request)
                     ui.button("Cancel", on_click=self.dialog.close)
 
@@ -548,16 +543,14 @@ class UINewRechargeDialog:
 
     def new_recharge_request(self, _event: nicegui.events.ClickEventArguments):
         """Get the information the user has input to the Dialog and use it to create a new RechargeRequest."""
-        start_date = datetime.date(self.start_year.value, self.start_month.value, 1)
-        end_date = datetime.date(self.end_year.value, self.end_month.value, calendar.monthrange(self.end_year.value, self.end_month.value)[1])
-        start_month_code = utilities.month_code(self.start_year.value, self.start_month.value)
-        end_month_code = utilities.month_code(self.end_year.value, self.end_month.value)
+        start_date = datetime.date(self.start_date.year, self.start_date.month, 1)
+        end_date = datetime.date(self.end_date.year, self.end_date.month, calendar.monthrange(self.end_date.year, self.end_date.month)[1])
 
         if end_date < start_date:
             ui.notify("End month must be after start month.")
             return 0
 
-        months = Month.select().where((Month.month_code >= start_month_code) & (Month.month_code <= end_month_code))
+        months: list[Month] = Month.select().where((Month.month_code >= self.start_date.month_code) & (Month.month_code <= self.end_date.month_code))
         for month in months:
             if month.exchange_rate == 1:
                 ui.notify(f"Exchange rate is 1 for month {utilities.date_from_month_code(month.month_code).strftime('%b-%Y')}. Must set exchange rate before creating recharge request.")
