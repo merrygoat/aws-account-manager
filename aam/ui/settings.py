@@ -64,13 +64,13 @@ class UIOrganizations:
         with ui.row().classes('w-full no-wrap'):
             with ui.row().classes('w-1/2'):
                 self.organization_grid = ui.aggrid({
-                "defaultColDef": {"sortable": False},
-                'columnDefs': [{"headerName": "id", "field": "id"},
-                               {"headerName": "Name", "field": "name", "editable": True}],
-                'rowData': {},
-                'rowSelection': 'single',
-                'stopEditingWhenCellsLoseFocus': True,
-            })
+                    "defaultColDef": {"sortable": False},
+                    'columnDefs': [{"headerName": "id", "field": "id"},
+                                   {"headerName": "Name", "field": "name", "editable": True}],
+                    'rowData': {},
+                    'rowSelection': 'single',
+                    'stopEditingWhenCellsLoseFocus': True,
+                })
             with ui.column():
                 self.add_new_org = ui.button("Add new organization", on_click=self.new_org_dialog.open)
                 self.delete_organization = ui.button("Delete selected organization", on_click=self.delete_organization)

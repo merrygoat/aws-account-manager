@@ -3,7 +3,7 @@ import datetime
 from typing import TYPE_CHECKING
 
 import nicegui.events
-from nicegui import ui
+from nicegui import ui, ElementFilter
 from peewee import JOIN
 
 import aam.aws
@@ -29,6 +29,8 @@ class UIAccountSelect:
         with ui.column():
             self.update_button = ui.button("Update Account Info", on_click=self.update_account_info)
             self.last_updated = ui.label()
+        with ui.column():
+            self.dark_mode_button = ui.button(icon='dark_mode', on_click=self.handle_theme_change)
 
         self.update_last_updated_label(self.organization_select.value)
         self.update_organization_select_options()
@@ -108,6 +110,19 @@ class UIAccountSelect:
         if self.organization_select.options:
             first_org = next(iter(self.organization_select.options))
             self.organization_select.set_value(first_org)
+
+    def handle_theme_change(self, event: nicegui.events.ClickEventArguments):
+        if self.dark_mode_button.props['icon'] == 'light_mode':
+            enabled = False
+            ui.dark_mode().disable()
+            self.dark_mode_button.props('icon=dark_mode')
+        else:
+            enabled = True
+            ui.dark_mode().enable()
+            self.dark_mode_button.props('icon=light_mode') 
+
+        for grid in ElementFilter(kind=ui.aggrid):
+            grid.classes(toggle='ag-theme-balham-dark ag-theme-balham')
 
 
 def get_and_process_account_info(org_id: str):

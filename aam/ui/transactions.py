@@ -235,7 +235,6 @@ class UIRechargeRequests:
                 'rowSelection': 'multiple',
                 'stopEditingWhenCellsLoseFocus': True,
             })
-
         with ui.column().classes("w-1/3"):
             ui.label("Email body").classes("text-4xl")
             with ui.grid(columns="auto 1fr").classes('w-full'):

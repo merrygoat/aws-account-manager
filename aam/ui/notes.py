@@ -27,6 +27,7 @@ class UIAccountNotes:
             'rowSelection': 'multiple',
             'stopEditingWhenCellsLoseFocus': True,
         })
+
         self.note_text = ui.textarea().classes("w-full").props('input-class=h-96')
         with ui.row().classes("w-full"):
             ui.space()
