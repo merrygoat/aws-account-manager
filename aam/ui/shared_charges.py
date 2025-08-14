@@ -37,7 +37,6 @@ class UISharedCharges:
                         'type': 'fitCellContents'
                     }
                 })
-                self.parent.aggrids.append(self.shared_charges_table)
                 with ui.row():
                     self.new_charge_button = ui.button("New Shared Charge", on_click=self.add_new_shared_charge)
                     self.edit_selected_button = ui.button("Edit Selected Shared Charge", on_click=self.edit_selected)

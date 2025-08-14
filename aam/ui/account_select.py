@@ -3,7 +3,7 @@ import datetime
 from typing import TYPE_CHECKING
 
 import nicegui.events
-from nicegui import ui
+from nicegui import ui, ElementFilter
 from peewee import JOIN
 
 import aam.aws
@@ -111,7 +111,7 @@ class UIAccountSelect:
             first_org = next(iter(self.organization_select.options))
             self.organization_select.set_value(first_org)
 
-    def handle_theme_change(self, e: nicegui.events.ValueChangeEventArguments):
+    def handle_theme_change(self, event: nicegui.events.ClickEventArguments):
         if self.dark_mode_button.props['icon'] == 'light_mode':
             enabled = False
             ui.dark_mode().disable()
@@ -121,9 +121,10 @@ class UIAccountSelect:
             ui.dark_mode().enable()
             self.dark_mode_button.props('icon=light_mode') 
 
-        for aggrid in self.parent.aggrids:
-            aggrid.classes(add='ag-theme-balham-dark' if enabled else 'ag-theme-balham',
+        for grid in ElementFilter(kind=ui.aggrid):
+            grid.classes(add='ag-theme-balham-dark' if enabled else 'ag-theme-balham',
                    remove='ag-theme-balham' if enabled else 'ag-theme-balham-dark')
+
 
 def get_and_process_account_info(org_id: str):
 

@@ -53,7 +53,6 @@ class UITransactions:
             'rowSelection': 'multiple',
             'stopEditingWhenCellsLoseFocus': True,
         })
-        self.parent.aggrids.append(self.transaction_grid)
 
         self.transaction_grid.on("cellValueChanged", self.update_transaction)
         with ui.row():
@@ -213,7 +212,6 @@ class UIRechargeRequests:
                 'rowSelection': 'single',
                 'stopEditingWhenCellsLoseFocus': True,
             })
-            self.parent.parent.aggrids.append(self.request_grid)
             with ui.row():
                 self.add_request_button = ui.button("Add new request", on_click=self.new_request_dialog.open)
                 self.delete_selected_request_button = ui.button("Delete selected request", on_click=self.delete_selected_request)
@@ -237,7 +235,6 @@ class UIRechargeRequests:
                 'rowSelection': 'multiple',
                 'stopEditingWhenCellsLoseFocus': True,
             })
-            self.parent.parent.aggrids.append(self.request_items_grid)
         with ui.column().classes("w-1/3"):
             ui.label("Email body").classes("text-4xl")
             with ui.grid(columns="auto 1fr").classes('w-full'):

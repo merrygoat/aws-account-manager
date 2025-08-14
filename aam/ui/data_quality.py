@@ -31,7 +31,6 @@ class UIDataQuality:
                                        {"headerName": "Organization", "field": "organization_name"}
                                        ],
                         'rowData': {}})
-                    self.parent.aggrids.append(self.no_open_grid)
                     ui.button("Refresh list", on_click=self.populate_no_open_grid)
 
                     ui.label("Closed/Suspended accounts with no close date")
@@ -42,7 +41,6 @@ class UIDataQuality:
                                        {"headerName": "Account Status", "field": "account_status"}
                                        ],
                         'rowData': {}})
-                    self.parent.aggrids.append(self.no_close_grid)
                     ui.button("Refresh list", on_click=self.populate_no_close_grid)
 
             with ui.tab_panel(tab_two):
@@ -58,7 +56,6 @@ class UIDataQuality:
                                        ],
                         'rowSelection': 'multiple',
                         'rowData': {}})
-                    self.parent.aggrids.append(self.missing_usage)
                     ui.button("Refresh list", on_click=self.populate_missing_usage_grid)
 
                     ui.label("Accounts with Monthly Usage outside of open/close dates").classes("text-2xl")
@@ -72,7 +69,6 @@ class UIDataQuality:
                                        ],
                         'rowSelection': 'multiple',
                         'rowData': {}})
-                    self.parent.aggrids.append(self.wrong_monthly_usage)
                     with ui.row():
                         ui.button("Refresh list", on_click=self.populate_wrong_monthly_usage)
                         ui.button("Delete selected months", on_click=self.delete_selected_monthly_usage)
@@ -88,7 +84,6 @@ class UIDataQuality:
                                        ],
                         'rowSelection': 'multiple',
                         'rowData': {}})
-                    self.parent.aggrids.append(self.recharges_missing_code_grid)
                     ui.button("Refresh list", on_click=self.populate_recharges_missing_code_grid)
 
             self.populate_no_open_grid()
