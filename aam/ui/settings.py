@@ -39,6 +39,7 @@ class UIExchangeRate:
             'rowData': {},
             'stopEditingWhenCellsLoseFocus': True,
         })
+        self.parent.parent.aggrids.append(self.month_grid)
         self.month_grid.on("cellValueChanged", self.update_exchange_rate)
         self.populate_exchange_rate_grid()
 
@@ -71,6 +72,7 @@ class UIOrganizations:
                 'rowSelection': 'single',
                 'stopEditingWhenCellsLoseFocus': True,
             })
+            self.parent.parent.aggrids.append(self.organization_grid)
             with ui.column():
                 self.add_new_org = ui.button("Add new organization", on_click=self.new_org_dialog.open)
                 self.delete_organization = ui.button("Delete selected organization", on_click=self.delete_organization)

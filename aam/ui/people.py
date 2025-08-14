@@ -33,6 +33,7 @@ class UIPeople:
                     'columnDefs': [{"headerName": "Account", "field": "account", "sort": "desc"},
                                    {"headerName": "Role", "field": "role"}],
                     'rowData': {}})
+                self.parent.aggrids.append(self.roles_grid)
         with ui.row():
             self.save_changes = ui.button("Save Changes", on_click=self.save_changes)
             self.add_new_person = ui.button("Add New Person", on_click=self.new_person_dialog.open)
