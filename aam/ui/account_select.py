@@ -122,8 +122,7 @@ class UIAccountSelect:
             self.dark_mode_button.props('icon=light_mode') 
 
         for grid in ElementFilter(kind=ui.aggrid):
-            grid.classes(add='ag-theme-balham-dark' if enabled else 'ag-theme-balham',
-                   remove='ag-theme-balham' if enabled else 'ag-theme-balham-dark')
+            grid.classes(toggle='ag-theme-balham-dark ag-theme-balham')
 
 
 def get_and_process_account_info(org_id: str):
