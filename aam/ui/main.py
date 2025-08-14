@@ -18,6 +18,8 @@ class UIMainForm:
     def __init__(self):
         ui.page_title("AWS Account Manager")
 
+        self.aggrids = []
+
         # Represents the ID of the organization currently selected in the UIAccountSelect gui element
         self._selected_organization_id: Optional[str] = None
         # Represents the ID of the account currently selected in the UIAccountSelect gui element
