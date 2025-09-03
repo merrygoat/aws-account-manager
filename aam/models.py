@@ -174,7 +174,7 @@ class Account(BaseModel):
         required_months = aam.utilities.get_months_between(start_date, end_date)
         self.check_missing_monthly_transactions(required_months)
 
-        # Join to Month and RechargeRequest is used by MonthlyUsage.to_json method
+        # The Join to Month and RechargeRequest tables prevent N+1 querying when MonthlyUsage.to_json is run
         usage: Iterable[MonthlyUsage] = (
             MonthlyUsage.select(MonthlyUsage, Month, RechargeRequest.reference)
             .join_from(MonthlyUsage, RechargeRequest, JOIN.LEFT_OUTER)
@@ -186,8 +186,10 @@ class Account(BaseModel):
     def check_missing_monthly_transactions(self, required_months: list[int]):
         """Accounts should have a usage transaction for each month the account is open. This function checks if the
         account has 'monthly' type transactions for each month code in `required_months`."""
+        self.add_months()
         usage: Iterable[MonthlyUsage] = (MonthlyUsage.select(MonthlyUsage.month_id)
-                                         .where((MonthlyUsage.month_id.in_(required_months)) & (MonthlyUsage.account_id == self.id))
+                                         .where((MonthlyUsage.month_id.in_(required_months)) &
+                                                (MonthlyUsage.account_id == self.id))
                                          )
         existing_transaction_months = [monthly_usage.month_id for monthly_usage in usage]
         missing_months = set(required_months) - set(existing_transaction_months)
@@ -195,6 +197,16 @@ class Account(BaseModel):
             for month_code in missing_months:
                 MonthlyUsage.create(account=self.id, month=month_code,
                                     date=aam.utilities.date_from_month_code(month_code))
+
+    @staticmethod
+    def add_months():
+        """Checks whether the Month table has all months up to the current month in it."""
+        required_months = aam.utilities.get_months_between(datetime.date(2021, 1, 1), datetime.date.today())
+        actual_months: list[int] = [row[0] for row in (Month.select(Month.month_code).tuples())]
+        missing_months = set(required_months) - set(actual_months)
+
+        for month_code in missing_months:
+            Month.create(month_code=month_code, exchange_rate=1)
 
     @property
     def final_date(self) -> datetime.date:
@@ -228,12 +240,14 @@ class Sysadmin(BaseModel):
     def full_name(self) -> str:
         return f"{self.person.first_name} {self.person.last_name}"
 
+
 class Note(BaseModel):
     id = peewee.AutoField()
     date = peewee.DateField()
     text = peewee.CharField()
     type = peewee.CharField()
     account = peewee.ForeignKeyField(Account, backref="notes")
+
 
 class MonthlyUsage(BaseModel):
     # Usage is always in dollars
