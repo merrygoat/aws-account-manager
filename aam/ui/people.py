@@ -29,6 +29,7 @@ class UIPeople:
             with ui.column().classes('w-1/2'):
                 ui.label("Person roles").classes("text-2xl")
                 self.roles_grid = ui.aggrid({
+                    'theme': 'balham',
                     'defaultColDef': {"suppressMovable": True},
                     'columnDefs': [{"headerName": "Account", "field": "account", "sort": "desc"},
                                    {"headerName": "Role", "field": "role"}],

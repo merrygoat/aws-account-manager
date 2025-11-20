@@ -26,6 +26,7 @@ class UIDataQuality:
                     ui.label("Account Open/Close dates").classes("text-2xl")
                     ui.label("Accounts with no open date")
                     self.no_open_grid = ui.aggrid({
+                        'theme': 'balham',
                         'defaultColDef': {"suppressMovable": True},
                         'columnDefs': [{"headerName": "Account", "field": "account_name", "sort": "desc"},
                                        {"headerName": "Organization", "field": "organization_name"}
@@ -35,6 +36,7 @@ class UIDataQuality:
 
                     ui.label("Closed/Suspended accounts with no close date")
                     self.no_close_grid = ui.aggrid({
+                        'theme': 'balham',
                         'defaultColDef': {"suppressMovable": True},
                         'columnDefs': [{"headerName": "Account", "field": "account_name", "sort": "desc"},
                                        {"headerName": "Organization", "field": "organization_name"},
@@ -47,6 +49,7 @@ class UIDataQuality:
                 with ui.column().classes('w-full no-wrap'):
                     ui.label("Accounts Missing Monthly Usage").classes("text-2xl")
                     self.missing_usage = ui.aggrid({
+                        'theme': 'balham',
                         'defaultColDef': {"suppressMovable": True},
                         'columnDefs': [{"headerName": "Account", "field": "account_name"},
                                        {"headerName": "Account ID", "field": "account_id", "sort": "asc"},
@@ -60,6 +63,7 @@ class UIDataQuality:
 
                     ui.label("Accounts with Monthly Usage outside of open/close dates").classes("text-2xl")
                     self.wrong_monthly_usage = ui.aggrid({
+                        'theme': 'balham',
                         'defaultColDef': {"suppressMovable": True},
                         'columnDefs': [{"headerName": "MonthlyUsageID", "field": "id"},
                                        {"headerName": "Account", "field": "account_name"},
@@ -77,6 +81,7 @@ class UIDataQuality:
                 with ui.column().classes('w-full no-wrap'):
                     ui.label("Recharge Transactions without project code").classes("text-2xl")
                     self.recharges_missing_code_grid = ui.aggrid({
+                        'theme': 'balham',
                         'defaultColDef': {"suppressMovable": True},
                         'columnDefs': [{"headerName": "Account", "field": "account_name"},
                                        {"headerName": "Account ID", "field": "account_id", "sort": "asc"},

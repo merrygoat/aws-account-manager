@@ -26,6 +26,7 @@ class UISharedCharges:
                 ui.label("Values are net values and do not include the support percentage. "
                          "VAT and the support charge are added automatically in the transaction tab.")
                 self.shared_charges_table = ui.aggrid({
+                    'theme': 'balham',
                     'columnDefs': [{"headerName": "id", "field": "id", "hide": True},
                                    {"headerName": "Name", "field": "name"},
                                    {"headerName": "Month", "field": "month", 'sort': 'asc', 'valueFormatter': 'value ? ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][new Date(value).getMonth()] + "-" + new Date(value).getFullYear() : "N/A"'},

@@ -62,6 +62,7 @@ class UIAccountDetails:
             with ui.tab_panel(tab_two):
                 ui.label("Account List").classes("text-2xl")
                 self.account_grid = ui.aggrid({
+                    'theme': 'balham',
                     'defaultColDef': {"suppressMovable": True},
                     'columnDefs': [{"headerName": "id", "field": "id"},
                                    {"headerName": "Organization", "field": "organization", "sort": "asc", "sortIndex": 0, "filter": True},

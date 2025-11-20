@@ -19,6 +19,7 @@ class UIAccountNotes:
 
         ui.label("Notes").classes("text-xl")
         self.notes_grid = ui.aggrid({
+            'theme': 'balham',
             'columnDefs': [{"headerName": "id", "field": "id", "hide": True},
                            {"headerName": "Date", "field": "date", "editable": True},
                            {"headerName": "Type", "field": "type"},

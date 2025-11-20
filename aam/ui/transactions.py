@@ -26,6 +26,7 @@ class UITransactions:
 
         ui.label("Account Transaction Journal").classes("text-4xl")
         self.transaction_grid = ui.aggrid({
+            'theme': 'balham',
             'defaultColDef': {"suppressMovable": True, "sortable": False},
             'columnDefs': [{"headerName": "id", "field": "id", "hide": True},
                            {"headerName": "Date", "field": "date", "editable": True},
@@ -201,6 +202,7 @@ class UIRechargeRequests:
         with ui.column().classes("w-1/4"):
             ui.label("Recharge Requests").classes("text-4xl")
             self.request_grid = ui.aggrid({
+                'theme': 'balham',
                 'columnDefs': [{"headerName": "request_id", "field": "id", "hide": True},
                                {"headerName": "Start Date", "field": "start_date", "sort": "asc", "sortIndex": 0},
                                {"headerName": "End Date", "field": "end_date", "sort": "asc", "sortIndex": 0},
@@ -220,6 +222,7 @@ class UIRechargeRequests:
         with ui.column().classes("w-1/3"):
             ui.label("Request items").classes("text-4xl")
             self.request_items_grid = ui.aggrid({
+                'theme': 'balham',
                 'columnDefs': [{"headerName": "account_id", "field": "account_id", "hide": True},
                                {"headerName": "transaction_ids", "field": "transaction_ids", "hide": True},
                                {"headerName": "Account", "field": "account_name", "sort": "asc", "sortIndex": 0},

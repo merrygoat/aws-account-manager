@@ -32,6 +32,7 @@ class UIExchangeRate:
         self.parent = parent
 
         self.month_grid = ui.aggrid({
+            'theme': 'balham',
             "defaultColDef": {"sortable": False},
             'columnDefs': [{"headerName": "id", "field": "month_code", "hide": True},
                            {"headerName": "Month", "field": "month", "cellDataType": "string"},
@@ -64,6 +65,7 @@ class UIOrganizations:
         with ui.row().classes('w-full no-wrap'):
             with ui.row().classes('w-1/2'):
                 self.organization_grid = ui.aggrid({
+                    'theme': 'balham',
                     "defaultColDef": {"sortable": False},
                     'columnDefs': [{"headerName": "id", "field": "id"},
                                    {"headerName": "Name", "field": "name", "editable": True}],
