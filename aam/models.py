@@ -25,11 +25,13 @@ class BaseModel(peewee.Model):
     class Meta:
         database = db
 
+
 class Organization(BaseModel):
     id = peewee.CharField(primary_key=True)
     name = peewee.CharField(null=True)
     accounts: "Account"  # backref
     last_updated_time: Iterable["LastAccountUpdate"]  # backref
+
 
 class Person(BaseModel):
     id = peewee.AutoField()
@@ -43,10 +45,12 @@ class Person(BaseModel):
     def full_name(self) -> str:
         return f"{self.first_name} {self.last_name}"
 
+
 class LastAccountUpdate(BaseModel):
     id = peewee.IntegerField(primary_key=True)
     organization = peewee.ForeignKeyField(Organization, backref="last_updated_time")
     time = peewee.DateTimeField(null=True)
+
 
 class Month(BaseModel):
     month_code: int = peewee.IntegerField(primary_key=True)
@@ -69,6 +73,7 @@ class Month(BaseModel):
 
     def to_date(self):
         return datetime.date(self.year, self.month, 1)
+
 
 class RechargeRequest(BaseModel):
     id = peewee.AutoField()
@@ -265,8 +270,9 @@ class MonthlyUsage(BaseModel):
     def to_json(self) -> dict:
         details = {"id": self.id, "account_id": self.account_id, "type": TRANSACTION_TYPES[self.type],
                    "date": self.date, "amount": self.amount, "shared_charge": self.shared_charge,
-                   "support_charge": self.support_charge, "currency": "$", "gross_total_dollar": self.gross_total_dollar,
-                   "gross_total_pound": self.gross_total_pound, "note": self.note}
+                   "support_charge": self.support_charge, "currency": "$",
+                   "gross_total_dollar": self.gross_total_dollar, "gross_total_pound": self.gross_total_pound,
+                   "note": self.note}
         if self.recharge_request:
             details["reference"] = f"Recharge - {self.recharge_request.reference}"
         return details
@@ -303,6 +309,7 @@ class MonthlyUsage(BaseModel):
             return self.gross_total_dollar * self.month.exchange_rate
         else:
             return Decimal(0)
+
 
 class Transaction(BaseModel):
     id = peewee.AutoField()
@@ -389,7 +396,7 @@ class Transaction(BaseModel):
         if self.gross_total_dollar is None:
             return None
 
-        return  self.gross_total_dollar * self.exchange_rate
+        return self.gross_total_dollar * self.exchange_rate
 
 
 class SharedCharge(BaseModel):

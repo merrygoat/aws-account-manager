@@ -25,7 +25,7 @@ class UIAccountDetails:
             with ui.tab_panel(tab_one):
                 with ui.row().classes('w-full no-wrap'):
                     with ui.column().classes('w-1/2'):
-                        ui.html("Account Details").classes("text-2xl")
+                        ui.label("Account Details").classes("text-2xl")
                         with ui.grid(columns='auto 1fr').classes('w-full'):
                             ui.label("Name:")
                             self.account_name = ui.label("")
@@ -35,7 +35,7 @@ class UIAccountDetails:
                             self.root_email = ui.label("")
                             ui.label("Account Status:")
                             self.account_status = ui.label("")
-                            ui.html("Billing/Contact Details").classes("text-2xl")
+                            ui.label("Billing/Contact Details").classes("text-2xl")
                             ui.element()
                             ui.label("Is recharged")
                             self.is_recharged = ui.switch()
@@ -60,7 +60,7 @@ class UIAccountDetails:
                     with ui.column().classes('w-1/3'):
                         self.notes = UIAccountNotes(self)
             with ui.tab_panel(tab_two):
-                ui.html("Account List").classes("text-2xl")
+                ui.label("Account List").classes("text-2xl")
                 self.account_grid = ui.aggrid({
                     'defaultColDef': {"suppressMovable": True},
                     'columnDefs': [{"headerName": "id", "field": "id"},

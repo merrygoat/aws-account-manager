@@ -16,7 +16,7 @@ class UIStatistics:
     def __init__(self, parent: "UIMainForm"):
         self.parent = parent
 
-        ui.html("Statistics").classes("text-2xl")
+        ui.label("Statistics").classes("text-2xl")
 
         with ui.row():
             with ui.column():

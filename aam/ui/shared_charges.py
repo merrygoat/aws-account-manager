@@ -20,7 +20,7 @@ class UISharedCharges:
 
         self.shared_charge_dialog = UISharedChargeDialog(self)
 
-        ui.html("Shared Charges").classes("text-2xl")
+        ui.label("Shared Charges").classes("text-2xl")
         with ui.row().classes("w-full no-wrap"):
             with ui.column().classes('w-2/3'):
                 ui.label("Values are net values and do not include the support percentage. "

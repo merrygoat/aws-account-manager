@@ -17,7 +17,7 @@ class UIPeople:
 
         with ui.row().classes('w-full no-wrap'):
             with ui.column().classes('w-1/3'):
-                ui.html("Person details").classes("text-2xl")
+                ui.label("Person details").classes("text-2xl")
                 self.person_select = ui.select(options=[], label="Person", on_change=self.show_person_details).classes("min-w-[400px]").props('popup-content-class="!max-h-[500px]"')
                 with ui.grid(columns="auto auto"):
                     ui.label("First Name")
@@ -27,7 +27,7 @@ class UIPeople:
                     ui.label("Email")
                     self.email = ui.input()
             with ui.column().classes('w-1/2'):
-                ui.html("Person roles").classes("text-2xl")
+                ui.label("Person roles").classes("text-2xl")
                 self.roles_grid = ui.aggrid({
                     'defaultColDef': {"suppressMovable": True},
                     'columnDefs': [{"headerName": "Account", "field": "account", "sort": "desc"},
@@ -89,13 +89,14 @@ class UIPeople:
             self.email.value = ""
             ui.notify("Person successfully deleted")
 
+
 class AddPersonDialog:
     def __init__(self, parent: "UIPeople"):
         self.parent = parent
 
         with ui.dialog() as self.dialog:
             with ui.card():
-                self.title = ui.html("Add Person").classes("text-2xl")
+                self.title = ui.label("Add Person").classes("text-2xl")
                 with ui.grid(columns="auto auto"):
                     ui.label("First Name")
                     self.first_name = ui.input()

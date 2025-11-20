@@ -17,7 +17,7 @@ class UIAccountNotes:
 
         self.add_note_dialog = AddNoteDialog(self)
 
-        ui.html("Notes").classes("text-xl")
+        ui.label("Notes").classes("text-xl")
         self.notes_grid = ui.aggrid({
             'columnDefs': [{"headerName": "id", "field": "id", "hide": True},
                            {"headerName": "Date", "field": "date", "editable": True},
@@ -142,7 +142,7 @@ class AddNoteDialog:
 
         with ui.dialog() as self.dialog:
             with ui.card():
-                ui.html("Add Note").classes("text-2xl")
+                ui.label("Add Note").classes("text-2xl")
                 self.date = aam.utilities.date_picker(datetime.date.today())
                 self.text = ui.textarea().classes('w-full')
                 with ui.row():

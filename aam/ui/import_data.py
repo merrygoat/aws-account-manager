@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 class UIImport:
     def __init__(self, parent: "UIMainForm"):
         self.parent = parent
-        ui.html("Import data").classes("text-xl")
+        ui.label("Import data").classes("text-xl")
         self.import_type = ui.select({1: "Monthly Usage - One month, multiple account", 2:"Monthly usage - One account, multiple months", 3:"Exchange Rate", 4:"Account Details", 5: "Transactions"},
                                      label="Import Type", value=1, on_change=self.import_type_selected)
         self.description = ui.label("").style('white-space: pre-wrap')
