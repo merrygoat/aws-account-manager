@@ -275,8 +275,7 @@ class UIRechargeRequests:
 
     def request_selected(self, event: nicegui.events.GenericEventArguments):
         """Populate the request item table. Triggered by selection of a row in the RechargeRequest table."""
-        if event.args["selected"] is True:
-            self.populate_request_items_grid(event.args["data"]["id"])
+        self.populate_request_items_grid(event.args["data"]["id"])
 
     @staticmethod
     def request_edited(event: nicegui.events.GenericEventArguments):
