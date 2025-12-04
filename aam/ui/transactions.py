@@ -107,7 +107,6 @@ class UITransactions:
             row_data = account.get_transaction_details()
 
         self.transaction_grid.options["rowData"] = row_data
-        self.transaction_grid.update()
 
     def update_transaction(self, event: nicegui.events.GenericEventArguments):
         """Called when the value of a cell in the transaction grid is changed."""
@@ -290,7 +289,6 @@ class UIRechargeRequests:
         recharge_requests: Iterable[RechargeRequest] = RechargeRequest.select()
         request_details = [request.to_json() for request in recharge_requests]
         self.request_grid.options["rowData"] = request_details
-        self.request_grid.update()
 
     async def delete_selected_request(self, _event: nicegui.events.ClickEventArguments):
         selected_row = await(self.request_grid.get_selected_row())
@@ -445,7 +443,7 @@ class UIRechargeRequests:
             accounts = [value for value in accounts.values()]
 
         self.request_items_grid.options["rowData"] = accounts
-        self.request_items_grid.update()
+
 
 class UINewSingleTransactionDialog:
     def __init__(self, parent: UITransactions):

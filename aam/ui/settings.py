@@ -47,7 +47,6 @@ class UIExchangeRate:
         months: Iterable[Month] = Month.select()
         month_details = [{"month_code": month.month_code, "month": str(month), "exchange_rate": month.exchange_rate} for month in months]
         self.month_grid.options["rowData"] = month_details
-        self.month_grid.update()
 
     @staticmethod
     def update_exchange_rate(event: nicegui.events.GenericEventArguments):
@@ -84,7 +83,6 @@ class UIOrganizations:
         orgs = Organization.select()
         org_details = [{"id": org.id, "name": org.name} for org in orgs]
         self.organization_grid.options["rowData"] = org_details
-        self.organization_grid.update()
 
     @staticmethod
     def update_org_name(event: nicegui.events.GenericEventArguments):

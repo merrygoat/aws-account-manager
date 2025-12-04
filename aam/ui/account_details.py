@@ -114,7 +114,6 @@ class UIAccountDetails:
             account_details.append(details)
 
         self.account_grid.options["rowData"] = account_details
-        self.account_grid.update()
 
     def save_account_changes(self):
         account: Account = Account.get(Account.id == self.account_id.text)

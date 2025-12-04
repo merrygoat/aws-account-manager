@@ -129,11 +129,9 @@ class UIAccountNotes:
         else:
             note_details = []
         self.notes_grid.options["rowData"] = note_details
-        self.notes_grid.update()
 
     def clear(self):
         self.notes_grid.options["rowData"] = {}
-        self.notes_grid.update()
 
 
 class AddNoteDialog:

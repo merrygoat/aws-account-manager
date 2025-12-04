@@ -58,16 +58,12 @@ class UIStatistics:
 
         account_items = {account.id: f"{account.name}" for account in accounts}
         self.account_select.set_options(account_items)
-        self.account_select.update()
-
 
     def select_all_accounts(self, _event: nicegui.events.ClickEventArguments):
         self.account_select.set_value(list(self.account_select.options.keys()))
-        self.account_select.update()
 
     def select_no_accounts(self, _event: nicegui.events.ClickEventArguments):
         self.account_select.set_value([])
-        self.account_select.update()
 
     def calculate_usage(self, event: nicegui.events.ClickEventArguments):
         if not (self.start_date.month or self.start_date.year):

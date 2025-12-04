@@ -105,7 +105,6 @@ class UISharedCharges:
                                        "month": date, "account_names": account_names})
 
         self.shared_charges_table.options["rowData"] = charge_details
-        self.shared_charges_table.update()
 
 
 class UISharedChargeDialog:

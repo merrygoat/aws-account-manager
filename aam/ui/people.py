@@ -62,7 +62,6 @@ class UIPeople:
             self.last_name.value = ""
             self.email.value = ""
             self.roles_grid.options["rowData"] = {}
-            self.roles_grid.update()
         else:
             person: Person = Person.get(Person.id == selected_person_id)
             self.first_name.value = person.first_name
@@ -75,7 +74,6 @@ class UIPeople:
                 for account in person.budget_holder:
                     roles.append({"role": "Budget Holder", "account": account.name})
             self.roles_grid.options["rowData"] = roles
-            self.roles_grid.update()
 
     def delete_person(self):
         selected_person_id = self.person_select.value

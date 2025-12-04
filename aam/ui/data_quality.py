@@ -102,7 +102,6 @@ class UIDataQuality:
         account_details = [{"account_name": account.name, "organization_name": account.organization.name}
                            for account in accounts]
         self.no_open_grid.options["rowData"] = account_details
-        self.no_open_grid.update()
 
     def populate_no_close_grid(self):
         account_status = ["Closed", "SUSPENDED"]
@@ -112,7 +111,6 @@ class UIDataQuality:
         account_details = [{"account_name": account.name, "organization_name": account.organization.name,
                             "account_status": account.status} for account in accounts]
         self.no_close_grid.options["rowData"] = account_details
-        self.no_close_grid.update()
 
     def populate_recharges_missing_code_grid(self):
         transactions: Iterable[Transaction] = (Transaction.select(Transaction, Account.name, Account.id)
@@ -121,7 +119,6 @@ class UIDataQuality:
         transaction_details = [{"account_name": transaction.account.name, "account_id": transaction.account_id,
                                 "transaction_date": transaction.date} for transaction in transactions]
         self.recharges_missing_code_grid.options["rowData"] = transaction_details
-        self.recharges_missing_code_grid.update()
 
     def populate_missing_usage_grid(self):
         accounts: Iterable[Account] = (Account.select(Account, Organization.name).join(Organization))
@@ -147,7 +144,6 @@ class UIDataQuality:
                                               "num_months": num_months, "missing_months": missing_months})
 
         self.missing_usage.options["rowData"] = account_summaries
-        self.missing_usage.update()
 
     def populate_wrong_monthly_usage(self):
         """Remove any MonthlyUsage transactions which fall before the opening date or after the closing date of an
@@ -167,7 +163,6 @@ class UIDataQuality:
                 usage_details.append({"id": usage.id, "account_name": usage.account.name,
                                       "account_id": usage.account.id, "date": usage.date, "usage": usage.amount})
         self.wrong_monthly_usage.options["rowData"] = usage_details
-        self.wrong_monthly_usage.update()
 
     async def delete_selected_monthly_usage(self, event: nicegui.events.ClickEventArguments):
         selected_rows = await(self.wrong_monthly_usage.get_selected_rows())
