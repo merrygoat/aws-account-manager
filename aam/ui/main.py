@@ -80,7 +80,8 @@ class UIMainForm:
     def get_selected_account_id(self) -> str | None:
         """Getter for selected_account_id instance attribute.
 
-        The selected_account_id represents the ID of the organization currently selected in the UIAccountSelect GUI element
+        The selected_account_id represents the ID of the organization currently selected in the UIAccountSelect GUI
+        element.
         """
         return self._selected_account_id
 
