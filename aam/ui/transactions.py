@@ -403,6 +403,7 @@ class UIRechargeRequests:
         self.email_subject.set_value(f"Research IT AWS account recharge - {transactions[0].account.name}")
         self.email_body.set_value(email_body)
 
+        self.parent.parent.change_selected_account(account_id)
 
     def request_item_cell_double_clicked(self, event: nicegui.events.GenericEventArguments):
         account: Account = Account.get(Account.id == event.args["data"]["account_id"])

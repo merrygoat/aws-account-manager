@@ -2,7 +2,7 @@ from typing import Optional
 
 from nicegui import ui
 
-from aam.models import Account
+from aam.models import Account, Organization
 from aam.ui.account_details import UIAccountDetails
 from aam.ui.account_select import UIAccountSelect
 from aam.ui.data_quality import UIDataQuality
@@ -86,6 +86,16 @@ class UIMainForm:
 
     def change_selected_account(self, account_id: str):
         """Change the account currently selected in the UIAccountSelect GUI element."""
+        account = (Account.select(Account.status, Organization.id)
+                   .join(Organization)
+                   .where(Account.id == account_id)[0])
+        org_id = account.organization.id
+        if self._selected_organization_id != org_id:
+            self.account_select.organization_select.set_value(org_id)
+        if account.status == "SUSPENDED":
+            self.account_select.show_suspended.set_value(True)
+        if account.status == "Closed":
+            self.account_select.show_closed.set_value(True)
         self.account_select.account_select.set_value(account_id)
 
     def change_selected_organization(self, organization_id: str | int):
